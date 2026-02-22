@@ -4,10 +4,10 @@ uvicorn[standard]==0.30.6
 pydantic==2.9.2
 pydantic-settings==2.5.2
 python-multipart==0.0.9
+python-dotenv==1.0.1
 
 # --- Real-Time (Webcam/Tracking) ---
 websockets==13.1
-JWT==1.4.4
 
 # --- Security & Auth (JWT) ---
 python-jose[cryptography]==3.3.0
@@ -19,6 +19,37 @@ sqlalchemy==2.0.35
 pgvector==0.3.6
 
 # --- Machine Learning / Computer Vision ---
-onnxruntime==1.19.2
+onnxruntime==1.20.0
 numpy==1.26.4
 opencv-python-headless==4.10.0.84
+
+# --- Database Migration ---
+alembic==1.11.1
+PyJWT==2.8.0
+
+# --- Testing ---
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# --- Image Processing ---
+Pillow==10.1.0
+
+# --- Deployment ---
+gunicorn==21.2.0
+uvicorn[standard]==0.30.6
+
+# Utilities
+fastapi-pagination==0.11.2
+gunicorn==20.1.0
+structlog==24.4.0
+requests==2.31.0
+pydantic[email]==2.5.3
+
+# ---AWS SKK ---
+boto3==1.28.7
+
+# --- Documentation ---
+mkdocs==1.4.3
+mkdocs-material==9.4.6
+mkdocs-material-extensions==1.1.1
+mkdocs-minify-plugin==0.6.4
