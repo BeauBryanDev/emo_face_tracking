@@ -1,22 +1,47 @@
 import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.engine.url import make_url
 from app.core.config import settings
 
 # Configure basic logging for database events
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Create the SQLAlchemy engine
-# pool_pre_ping=True ensures that connections are validated before being used,
-# preventing errors if the PostgreSQL container restarts or a connection drops.
-# pool_size and max_overflow help manage concurrent connections efficiently.
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=15
-)
+
+def _create_engine_from_settings():
+    """
+    Create the SQLAlchemy engine with settings that are compatible with both
+    PostgreSQL (production) and SQLite (tests/CI).
+
+    - For PostgreSQL: use an explicit connection pool with pre-ping enabled.
+    - For SQLite: avoid pool_size/max_overflow which are not supported with
+      the default SQLite pools (e.g. SingletonThreadPool).
+    """
+    database_url = settings.DATABASE_URL
+    url = make_url(database_url)
+
+    if url.get_backend_name() == "sqlite":
+        # SQLite-specific engine (used mainly in tests / CI)
+        # Do NOT pass pool_size/max_overflow – they cause the error you saw:
+        # "Invalid argument(s) 'max_overflow' sent to create_engine() ..."
+        return create_engine(
+            database_url,
+            connect_args={"check_same_thread": False},
+        )
+
+    # PostgreSQL (and other non-SQLite) engine configuration
+    # pool_pre_ping=True ensures that connections are validated before use.
+    return create_engine(
+        database_url,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=15,
+    )
+
+
+# Create a module-level engine using the helper above
+engine = _create_engine_from_settings()
 
 # SessionLocal is a factory for new Session objects
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
