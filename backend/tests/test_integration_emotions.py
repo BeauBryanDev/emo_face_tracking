@@ -1,6 +1,7 @@
 import pytest
 from datetime import datetime, timezone
 from app.models.emotions import Emotion
+import json
 
 
 # Helper Insert Emotion Records into test DB
@@ -15,7 +16,7 @@ def _insert_emotion(db_session, user_id: int, dominant_emotion: str,
         user_id          = user_id,
         dominant_emotion = dominant_emotion,
         confidence       = confidence,
-        emotion_scores   = emotion_scores,
+        emotion_scores   = json.dumps(emotion_scores) if emotion_scores else None,
         timestamp        = datetime.now(timezone.utc)
     )
     db_session.add(record)
