@@ -55,7 +55,7 @@ jobs:
           ENVIRONMENT: development
           LOG_LEVEL: WARNING
           SECRET_KEY: ci-test-secret-key-not-for-production
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
           MODELS_PATH: /app/ml_weights
           PYTHONPATH: .
         run: |
@@ -70,7 +70,7 @@ jobs:
           ENVIRONMENT: development
           LOG_LEVEL: WARNING
           SECRET_KEY: ci-test-secret-key-not-for-production
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
           MODELS_PATH: /app/ml_weights
           PYTHONPATH: .
         run: |
