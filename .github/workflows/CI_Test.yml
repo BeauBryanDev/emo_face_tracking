@@ -60,9 +60,9 @@ jobs:
           PYTHONPATH: .
         run: |
           pytest tests/test_face_math.py \
-                 tests/test_face_geometry.py \
-                 tests/test_inference_engine.py \
-                 -v --tb=short
+            tests/test_face_geometry.py \
+            tests/test_inference_engine.py \
+            -v --tb=short
 
       - name: Run integration tests
         working-directory: backend
