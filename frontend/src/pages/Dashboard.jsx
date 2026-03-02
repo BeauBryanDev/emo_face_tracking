@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import Text from '../components/ui/Text';
 import AvatarCard from '../components/ui/AvatarCard';
@@ -194,4 +193,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

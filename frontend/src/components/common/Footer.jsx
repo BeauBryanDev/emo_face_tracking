@@ -78,7 +78,7 @@ const Footer = () => {
     const checkBackend = async () => {
       try {
         const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
-        const res    = await fetch(`${apiUrl.replace('/api/v1', '')}/health`, {
+        const res    = await fetch(`${apiUrl}/health`, {
           signal: AbortSignal.timeout(3000),
         })
         setBackendOk(res.ok)

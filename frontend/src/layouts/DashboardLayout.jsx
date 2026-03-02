@@ -21,12 +21,45 @@ const NAV_ITEMS = [
     ),
   },
   {
+    path:  '/inference',
+    label: 'INFERENCE',
+    icon:  (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4 12h16" />
+        <path d="M12 4v16" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    ),
+  },
+  {
+    path:  '/history',
+    label: 'HISTORY',
+    icon:  (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7v6l4 2" />
+      </svg>
+    ),
+  },
+  {
     path:  '/emotions',
     label: 'EMOTION LOG',
     icon:  (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M3 3h18v14H3z" />
         <path d="M7 17l5-5 3 3 4-6" />
+      </svg>
+    ),
+  },
+  {
+    path:  '/analytics',
+    label: 'ANALYTICS',
+    icon:  (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4 19V5" />
+        <path d="M10 19V9" />
+        <path d="M16 19v-6" />
+        <path d="M22 19V3" />
       </svg>
     ),
   },

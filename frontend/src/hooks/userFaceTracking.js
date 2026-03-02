@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { getStreamUrl } from '../api/inference';
 
 export const useFaceTracking = () => {
   const { token } = useAuth();
@@ -31,12 +32,12 @@ export const useFaceTracking = () => {
     if (!token) return;
 
     // URL del backend (ajusta según tu .env)
-    const wsUrl = `ws://localhost:8000/api/v1/ws/stream?token=${token}`;
+    const wsUrl = getStreamUrl(token);
     wsRef.current = new WebSocket(wsUrl);
 
     wsRef.current.onopen = () => setIsConnected(true);
     wsRef.current.onmessage = (event) => {
-      const data = json.parse(event.data);
+      const data = JSON.parse(event.data);
       setResults(data);
     };
     wsRef.current.onclose = () => setIsConnected(false);

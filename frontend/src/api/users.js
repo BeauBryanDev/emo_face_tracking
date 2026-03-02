@@ -32,3 +32,8 @@ export const deleteFaceEmbedding = async () => {
   const response = await api.delete('/users/me/face_embedding')
   return response.data
 }
+
+export const refreshFaceEmbedding = async () => {
+  const response = await api.post('/users/me/face_embedding')
+  return response.data
+}

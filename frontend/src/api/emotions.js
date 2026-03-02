@@ -27,3 +27,13 @@ export const getEmotionScores = async (limit = 10) => {
   const response = await api.get('/emotions/scores', { params: { limit } })
   return response.data
 }
+
+export const getEmotionDetails = async (emotion) => {
+  const response = await api.get('/emotions/details', { params: { emotion } })
+  return response.data
+}
+
+export const getEmotionScoresChart = async () => {
+  const response = await api.get('/emotions/scores/chart')
+  return response.data
+}

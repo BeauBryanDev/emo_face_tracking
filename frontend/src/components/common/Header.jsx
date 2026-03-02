@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useBiometrics } from '../../context/Biometrics'
 
 // -----------------------------------------------------------------------------
 // PAGE TITLE MAP
@@ -9,7 +10,10 @@ import { useAuth } from '../../context/AuthContext'
 // -----------------------------------------------------------------------------
 const PAGE_TITLES = {
   '/dashboard': { title: 'LIVE STREAM',   sub: 'REAL-TIME BIOMETRIC FEED' },
+  '/inference': { title: 'INFERENCE',     sub: 'REAL-TIME STREAMING' },
+  '/history':   { title: 'HISTORY',       sub: 'EMOTION ARCHIVES' },
   '/emotions':  { title: 'EMOTION LOG',   sub: 'DETECTION HISTORY & ANALYTICS' },
+  '/analytics':{ title: 'ANALYTICS',     sub: 'PCA EMBEDDING SPACE' },
   '/profile':   { title: 'OPERATOR',      sub: 'IDENTITY & BIOMETRIC PROFILE' },
 }
 
@@ -58,7 +62,7 @@ const SystemClock = () => {
 // USER AVATAR
 // Initials-based avatar with neon glow
 // -----------------------------------------------------------------------------
-const UserAvatar = ({ user }) => {
+const UserAvatar = ({ user, hasEmbedding }) => {
   const initials = user?.full_name
     ? user.full_name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
     : 'OP'
@@ -83,7 +87,7 @@ const UserAvatar = ({ user }) => {
     }}>
       {initials}
       {/* Biometric enrolled indicator */}
-      {user?.face_embedding && (
+      {hasEmbedding && (
         <div style={{
           position: 'absolute',
           bottom: -2, right: -2,
@@ -103,6 +107,7 @@ const UserAvatar = ({ user }) => {
 // -----------------------------------------------------------------------------
 const Header = () => {
   const { user }   = useAuth()
+  const { hasEmbedding } = useBiometrics()
   const location   = useLocation()
   const pageInfo   = PAGE_TITLES[location.pathname] || { title: 'SYSTEM', sub: 'FACETRACK_AI' }
 
@@ -214,7 +219,7 @@ const Header = () => {
         }} />
 
         {/* User avatar */}
-        <UserAvatar user={user} />
+        <UserAvatar user={user} hasEmbedding={hasEmbedding} />
       </div>
 
       {/* Bottom glow line */}

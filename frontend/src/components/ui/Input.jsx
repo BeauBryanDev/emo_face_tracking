@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 
 const Input = forwardRef(({ 
   type = "text", 
@@ -54,4 +54,3 @@ const Input = forwardRef(({
 Input.displayName = 'Input';
 
 export default Input;
-

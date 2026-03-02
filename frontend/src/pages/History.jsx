@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { useAuth } from '../context/AuthContext';
+import { getEmotionHistory } from '../api/emotions';
 import { History as HistoryIcon, Filter, ChevronLeft, ChevronRight, AlertTriangle, Database } from 'lucide-react';
 
 const VALID_EMOTIONS = [
@@ -9,7 +8,6 @@ const VALID_EMOTIONS = [
 ];
 
 const History = () => {
-  const { token } = useAuth();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,16 +35,11 @@ const History = () => {
       }
 
       // Llamada Axios al backend (Ajusta la URL base si la tienes configurada en tu axios.js)
-      const response = await axios.get('http://localhost:8000/api/v1/emotions/history', {
-        params: params,
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
+      const data = await getEmotionHistory(params);
 
-      setRecords(response.data.records);
-      setTotalPages(response.data.total_pages);
-      setTotalRecords(response.data.total_records);
+      setRecords(data.records);
+      setTotalPages(data.total_pages);
+      setTotalRecords(data.total_records);
       
     } catch (err) {
       console.error("Error fetching history:", err);
@@ -54,7 +47,7 @@ const History = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, emotionFilter, token]);
+  }, [page, emotionFilter]);
 
   // Disparar la petición cuando cambia la página o el filtro
   useEffect(() => {
@@ -137,7 +130,7 @@ const History = () => {
               <tbody className="font-mono text-sm text-purple-100">
                 {records.map((record) => (
                   <tr key={record.id} className="border-b border-purple-900/50 hover:bg-purple-800/20 transition-colors">
-                    <td className="p-4 text-purple-500 text-xs">{record.id.substring(0, 8)}...</td>
+                    <td className="p-4 text-purple-500 text-xs">{String(record.id).substring(0, 8)}...</td>
                     <td className="p-4">{formatCyberTime(record.timestamp)}</td>
                     <td className="p-4">
                       <span className="px-2 py-1 bg-purple-900 border border-purple-600 text-neon-purple text-xs tracking-wider">
