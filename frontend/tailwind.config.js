@@ -17,7 +17,7 @@ export default {
           400: '#aa00ff',
           300: '#cc44ff',
           200: '#dd88ff',
-          100: '#a114ddff',
+          100: '#f0ccff',
         },
         neon: {
           purple: '#bf00ff',

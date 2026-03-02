@@ -1,3 +1,396 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* -----------------------------------------------------------------------------
+   CSS CUSTOM PROPERTIES - Cyberpunk Purple Design System
+----------------------------------------------------------------------------- */
+:root {
+  /* Purple scale */
+  --purple-950: #0d0010;
+  --purple-900: #1a0030;
+  --purple-800: #2d0057;
+  --purple-700: #4a0080;
+  --purple-600: #6600b3;
+  --purple-500: #8800e6;
+  --purple-400: #aa00ff;
+  --purple-300: #cc44ff;
+  --purple-200: #dd88ff;
+  --purple-100: #f0ccff;
+
+  /* Violet scale */
+  --violet-700: #5b21b6;
+  --violet-600: #7c3aed;
+  --violet-500: #8b5cf6;
+  --violet-400: #a855f7;
+  --violet-300: #c084fc;
+
+  /* Neon accents */
+  --neon-purple: #bf00ff;
+  --neon-violet: #9d00ff;
+  --neon-pink:   #ff00cc;
+
+  /* Glow effects */
+  --glow-xs: 0 0 4px rgba(170, 0, 255, 0.5);
+  --glow-sm: 0 0 8px rgba(170, 0, 255, 0.6);
+  --glow-md: 0 0 20px rgba(170, 0, 255, 0.5), 0 0 40px rgba(170, 0, 255, 0.2);
+  --glow-lg: 0 0 30px rgba(170, 0, 255, 0.7), 0 0 60px rgba(170, 0, 255, 0.3), 0 0 100px rgba(170, 0, 255, 0.1);
+
+  /* Surface colors */
+  --surface-0: #0d0010;
+  --surface-1: #130020;
+  --surface-2: #1e0035;
+  --surface-3: #2a0048;
+
+  /* Border */
+  --border-dim:    rgba(170, 0, 255, 0.15);
+  --border-normal: rgba(170, 0, 255, 0.3);
+  --border-bright: rgba(170, 0, 255, 0.6);
+
+  /* Typography */
+  --font-display: 'Orbitron', monospace;
+  --font-mono:    'Share Tech Mono', monospace;
+  --font-body:    'Rajdhani', sans-serif;
+}
+
+/* -----------------------------------------------------------------------------
+   BASE RESET
+----------------------------------------------------------------------------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  background-color: var(--purple-950);
+  color: var(--purple-100);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* -----------------------------------------------------------------------------
+   SCANLINE EFFECT - Cyberpunk atmosphere
+----------------------------------------------------------------------------- */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.06) 2px,
+    rgba(0, 0, 0, 0.06) 4px
+  );
+  pointer-events: none;
+  z-index: 9998;
+}
+
+/* -----------------------------------------------------------------------------
+   TYPOGRAPHY
+----------------------------------------------------------------------------- */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  color: var(--purple-100);
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+}
+
+code, pre, .mono {
+  font-family: var(--font-mono);
+}
+
+/* -----------------------------------------------------------------------------
+   CYBERPUNK COMPONENT UTILITIES
+----------------------------------------------------------------------------- */
+
+/* Neon border card */
+.cyber-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border-normal);
+  position: relative;
+  overflow: hidden;
+}
+
+.cyber-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon-purple), transparent);
+  opacity: 0.8;
+}
+
+/* Glowing input */
+.cyber-input {
+  background: var(--surface-2);
+  border: 1px solid var(--border-normal);
+  color: var(--purple-100);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  padding: 0.75rem 1rem;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.cyber-input:focus {
+  border-color: var(--neon-purple);
+  box-shadow: var(--glow-sm);
+}
+
+.cyber-input::placeholder {
+  color: var(--purple-600);
+  font-family: var(--font-mono);
+}
+
+/* Neon button */
+.cyber-btn {
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.75rem 2rem;
+  background: transparent;
+  border: 1px solid var(--neon-purple);
+  color: var(--neon-purple);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.cyber-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--neon-purple);
+  transform: translateX(-100%);
+  transition: transform 0.2s;
+  z-index: -1;
+}
+
+.cyber-btn:hover {
+  color: var(--purple-950);
+  box-shadow: var(--glow-md);
+}
+
+.cyber-btn:hover::before {
+  transform: translateX(0);
+}
+
+.cyber-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cyber-btn:disabled:hover::before {
+  transform: translateX(-100%);
+}
+
+/* Primary filled button */
+.cyber-btn-primary {
+  background: linear-gradient(135deg, var(--purple-700), var(--purple-500));
+  border: 1px solid var(--purple-400);
+  color: var(--purple-100);
+}
+
+.cyber-btn-primary:hover {
+  background: linear-gradient(135deg, var(--purple-600), var(--purple-400));
+  box-shadow: var(--glow-md);
+  color: white;
+}
+
+.cyber-btn-primary::before {
+  display: none;
+}
+
+/* Label */
+.cyber-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--purple-400);
+}
+
+/* Glow text */
+.neon-text {
+  color: var(--neon-purple);
+  text-shadow: var(--glow-sm);
+}
+
+.neon-text-lg {
+  color: var(--neon-purple);
+  text-shadow: var(--glow-lg);
+}
+
+/* Separator */
+.cyber-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-bright), transparent);
+  margin: 1.5rem 0;
+}
+
+/* Corner decoration */
+.cyber-corner {
+  position: relative;
+}
+
+.cyber-corner::before,
+.cyber-corner::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  border-color: var(--neon-purple);
+  border-style: solid;
+}
+
+.cyber-corner::before {
+  top: 0; left: 0;
+  border-width: 1px 0 0 1px;
+}
+
+.cyber-corner::after {
+  bottom: 0; right: 0;
+  border-width: 0 1px 1px 0;
+}
+
+/* Data readout style */
+.data-readout {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--purple-300);
+  background: var(--surface-2);
+  border-left: 2px solid var(--neon-purple);
+  padding: 0.5rem 0.75rem;
+}
+
+/* Status indicator */
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--neon-purple);
+  box-shadow: var(--glow-sm);
+  animation: statusPulse 2s ease-in-out infinite;
+}
+
+.status-dot.offline {
+  background: var(--purple-700);
+  box-shadow: none;
+  animation: none;
+}
+
+.status-dot.warning {
+  background: #ff9900;
+  box-shadow: 0 0 8px rgba(255, 153, 0, 0.6);
+}
+
+/* -----------------------------------------------------------------------------
+   ANIMATIONS
+----------------------------------------------------------------------------- */
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes glitchFlicker {
+  0%, 97%, 100% { opacity: 1; }
+  98%            { opacity: 0.4; }
+  99%            { opacity: 0.8; }
+}
+
+@keyframes slideInFromLeft {
+  from { opacity: 0; transform: translateX(-20px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInFromBottom {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes scanLine {
+  0%   { top: -2px; }
+  100% { top: 100%; }
+}
+
+.animate-slide-left   { animation: slideInFromLeft   0.4s ease-out forwards; }
+.animate-slide-bottom { animation: slideInFromBottom 0.4s ease-out forwards; }
+.animate-fade-in      { animation: fadeIn            0.3s ease-out forwards; }
+.animate-glitch       { animation: glitchFlicker     4s infinite; }
+
+/* Staggered entry animations for lists */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.10s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.20s; }
+.stagger-5 { animation-delay: 0.25s; }
+
+/* -----------------------------------------------------------------------------
+   SCROLLBAR
+----------------------------------------------------------------------------- */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--purple-950); }
+::-webkit-scrollbar-thumb {
+  background: var(--purple-700);
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--neon-purple);
+  box-shadow: var(--glow-xs);
+}
+
+/* -----------------------------------------------------------------------------
+   TAILWIND CUSTOM UTILITIES
+----------------------------------------------------------------------------- */
+@layer utilities {
+  .text-neon    { color: var(--neon-purple); text-shadow: var(--glow-sm); }
+  .border-neon  { border-color: var(--neon-purple); }
+  .bg-surface-0 { background-color: var(--surface-0); }
+  .bg-surface-1 { background-color: var(--surface-1); }
+  .bg-surface-2 { background-color: var(--surface-2); }
+  .bg-surface-3 { background-color: var(--surface-3); }
+  .glow-sm      { box-shadow: var(--glow-sm); }
+  .glow-md      { box-shadow: var(--glow-md); }
+  .glow-lg      { box-shadow: var(--glow-lg); }
+  .font-display { font-family: var(--font-display); }
+  .font-mono-cyber { font-family: var(--font-mono); }
+}
+
+@layer components {
+  .cyber-loader-text {
+    @apply font-display text-lg font-black tracking-[0.3em] text-neon-purple uppercase;
+    text-shadow: var(--glow-md);
+  }
+}
+
+@keyframes scan-line-horizontal {
+  0%   { left: -40%; }
+  100% { left: 140%; }
+}
+
+.animate-scan-fast {
+  animation: scan-line-horizontal 1.2s linear infinite;
+}
+

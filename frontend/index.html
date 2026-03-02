@@ -26,7 +26,7 @@
         --purple-400: #aa00ff;
         --purple-300: #cc44ff;
         --purple-200: #dd88ff;
-        --purple-100: #9f0adf;
+        --purple-100: #f0ccff;
         --violet-500: #7c3aed;
         --violet-400: #a855f7;
         --neon-purple: #bf00ff;
@@ -159,7 +159,20 @@
       ::-webkit-scrollbar-thumb:hover {
         background: var(--neon-purple);
         box-shadow: var(--glow-sm);
+      } 
+
+      .boot-status::after {
+        content: 'INITIALIZING NEURAL CORE...';
+        animation: bootText 1.2s steps(1) forwards;
       }
+
+      @keyframes bootText {
+        0%   { content: 'INITIALIZING NEURAL CORE...'; }
+        30%  { content: 'LOADING BIOMETRIC MODULES...'; }
+        60%  { content: 'CALIBRATING EMOTION ENGINE...'; }
+        100% { content: 'SYSTEM READY'; }
+      }
+
     </style>
   </head>
 
