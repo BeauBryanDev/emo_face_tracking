@@ -79,19 +79,19 @@ def apply_pca_reduction(embeddings: np.ndarray, n_components: int = 128) -> np.n
     if embeddings.shape[1] <= n_components:
         return embeddings
 
-    # Step 1: Mean centering the data
+    # i : Mean centering the data
     mean_vector = np.mean(embeddings, axis=0)
     centered_data = embeddings - mean_vector
     
     max_components = min(embeddings.shape[0], embeddings.shape[1])
     n_components   = min(n_components, max_components)
     
-    # Step 2: Singular Value Decomposition (SVD)
+    # ii : Singular Value Decomposition (SVD)
     # X = U * S * V^T
     # We use full_matrices=False for computational efficiency on large datasets.
     U, S, Vt = np.linalg.svd(centered_data, full_matrices=False)
-    
-    # Step 3: Projection onto the principal components
+    #Getting the EigenVector, these get the most co Varaicne of Human Faces image frame
+    # iii : Projection onto the principal components
     # We take the top 'n_components' from the transposed right singular vectors (Vt)
     principal_components = Vt.T[:, :n_components]
     reduced_data = np.dot(centered_data, principal_components)

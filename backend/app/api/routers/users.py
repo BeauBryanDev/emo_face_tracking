@@ -223,6 +223,7 @@ async def register_biometrics(
 
     # 7. Align and Extract the Embedding
     aligned_face_bgr = align_face(image, landmarks)
+    # ArcFace expects RGB input, but OpenCV uses BGR by default, so we convert it before embedding extraction
     aligned_face = cv2.cvtColor(aligned_face_bgr, cv2.COLOR_BGR2RGB)
     embedding = inference_engine.get_face_embedding(aligned_face)
 

@@ -48,7 +48,7 @@ async def register_user(user_in: UserCreate, db: Session = Depends(get_db)):
 
 @router.post("/login")
 async def login_user(
-    db: Session = Depends(get_db), 
+    db: Session = Depends(get_db),  # Dependency injection for database session
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
     """

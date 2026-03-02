@@ -24,8 +24,8 @@ VALID_EMOTIONS = [
 
 @router.get("/history", status_code=status.HTTP_200_OK)
 async def get_emotion_history(
-    page: int              = Query(default=1, ge=1, description="Numero de pagina"),
-    page_size: int         = Query(default=10, ge=1, le=100, description="Registros por pagina"),
+    page: int      = Query(default=1, ge=1, description="Numero de pagina"),
+    page_size: int     = Query(default=10, ge=1, le=100, description="Registros por pagina"),
     emotion_filter: Optional[str] = Query(
         default=None,
         description="Filtrar por emocion especifica (ej: Happiness, Anger)"
@@ -48,7 +48,7 @@ async def get_emotion_history(
     Los resultados se ordenan del mas reciente al mas antiguo.
     """
     logger.info(
-        f"Historial de emociones solicitado.",
+        f"Request for emotion history.",
         extra={"user_id": current_user.id}
     )
 

@@ -41,9 +41,9 @@ def compute_ear_from_landmarks(landmarks: np.ndarray) -> float :
         Computes the ear shape from the given landmarks.
         Calculate the approximate Eye Aspect Ratio (EAR) using the two SCRFD eye landmarks.
 
-        With only two points (left and right eye), we cannot calculate the complete 6-point Dlib EAR. Instead, I calculate the ratio of the estimated vertical inter-ocular distance to the horizontal distance.
+        With only two points (left and right eye), I  cannot calculate the complete 6-point Dlib EAR. Instead, I calculate the ratio of the estimated vertical inter-ocular distance to the horizontal distance.
 
-        For a more accurate EAR, MediaPipe Face Mesh (468 points) is recommended. With SCRFD, we use an approximation that is sufficient for real-time drowsiness detection.
+        For a more accurate EAR, MediaPipe Face Mesh (468 points) is recommended. With SCRFD, I use an approximation that is sufficient for real-time drowsiness detection.
 
         Args:
 
@@ -308,7 +308,7 @@ def estimate_head_pose(
         "is_frontal"     : is_frontal,
         "rotation_vector": rotation_vector.flatten().tolist(),
     }
-    
+    # Gemoetry data come frame /frame ,  it had better to use Kalman Filtering to establish EARM ,MARS  , smooth transitions and reduce camera noise. 
 
 
 def _classify_head_pose(yaw: float, pitch: float, roll: float) -> str:

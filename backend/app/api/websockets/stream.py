@@ -147,7 +147,7 @@ async def websocket_endpoint(
                         confidence=float(confidence),  # Cast to float to avoid numpy type issues
                         emotion_scores=scores          # PostgreSQL will automatically cast this dict to JSONB
                     )
-                    
+                    # db thread is separate from the main event loop, so we use run_in_executor to avoid blocking
                     db.add(new_emotion_record)
                     db.commit()
                     
