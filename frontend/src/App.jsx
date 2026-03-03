@@ -15,11 +15,9 @@ import History   from './pages/History'
 import Inference from './pages/Inference'
 import Analytics from './pages/Analytics'
 
-// -----------------------------------------------------------------------------
 // PROTECTED ROUTE
 // Redirects to /login if user is not authenticated.
 // Shows cyberpunk boot screen while auth state is loading.
-// -----------------------------------------------------------------------------
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth()
 
@@ -28,12 +26,10 @@ const ProtectedRoute = ({ children }) => {
   return children
 }
 
-// -----------------------------------------------------------------------------
 // PUBLIC ROUTE
 
 // Redirects authenticated users to /dashboard.
 // Prevents logged-in users from seeing login/register pages.
-// -----------------------------------------------------------------------------
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth()
 
@@ -42,10 +38,9 @@ const PublicRoute = ({ children }) => {
   return children
 }
 
-// -----------------------------------------------------------------------------
 // CYBERPUNK LOADER
 // Shown while auth state is being restored from localStorage.
-// -----------------------------------------------------------------------------
+
 const CyberpunkLoader = () => (
   <div style={{
     minHeight: '100vh',
@@ -96,9 +91,8 @@ const CyberpunkLoader = () => (
   </div>
 )
 
-// -----------------------------------------------------------------------------
 // ROUTES
-// -----------------------------------------------------------------------------
+
 const App = () => (
   <Routes>
     {/* Public routes - redirect to dashboard if already logged in */}

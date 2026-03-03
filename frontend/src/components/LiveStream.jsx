@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Activity, ShieldCheck, ShieldAlert, Eye, Zap, AlertTriangle, Cpu } from 'lucide-react';
-import { useFaceTracking } from '../hooks/userFaceTracking';
+import { useFaceTracking } from '../hooks/UseFaceTracking';
 import EmotionRadar from './EmotionRadar';
 
 const LiveStream = () => {

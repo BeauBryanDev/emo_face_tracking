@@ -65,7 +65,7 @@ const NAV_ITEMS = [
   },
   {
     path:  '/profile',
-    label: 'OPERATOR',
+    label: 'OPERATOR PROFILE',
     icon:  (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <circle cx="12" cy="8" r="4" />
@@ -184,26 +184,29 @@ const Sidebar = () => {
               display: 'flex',
               alignItems: 'center',
               gap: '0.75rem',
-              padding: '0.7rem 0.75rem',
+              padding: '0.8rem 0.8rem',
               marginBottom: '0.25rem',
               textDecoration: 'none',
               fontFamily: 'Orbitron, monospace',
-              fontSize: '0.62rem',
-              fontWeight: 600,
-              letterSpacing: '0.15em',
-              color: isActive ? '#cc44ff' : 'rgba(170,0,255,0.5)',
-              background: isActive ? 'rgba(170,0,255,0.1)' : 'transparent',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              letterSpacing: '0.12em',
+              color: isActive ? '#f0ccff' : '#d9a2ff',
+              background: isActive ? 'rgba(170,0,255,0.16)' : 'transparent',
               border: isActive
-                ? '1px solid rgba(170,0,255,0.25)'
+                ? '1px solid rgba(220,150,255,0.55)'
                 : '1px solid transparent',
               borderLeft: isActive
-                ? '2px solid #bf00ff'
+                ? '3px solid #cc88ff'
                 : '2px solid transparent',
               transition: 'all 0.2s',
-              boxShadow: isActive ? '0 0 12px rgba(170,0,255,0.1)' : 'none',
+              textShadow: isActive
+                ? '0 0 12px rgba(220,150,255,0.7)'
+                : '0 0 8px rgba(190,120,255,0.45)',
+              boxShadow: isActive ? '0 0 16px rgba(190,120,255,0.22)' : 'none',
             })}
           >
-            <span style={{ opacity: 0.85, flexShrink: 0 }}>{icon}</span>
+            <span style={{ opacity: 0.95, flexShrink: 0 }}>{icon}</span>
             <span>{label}</span>
           </NavLink>
         ))}

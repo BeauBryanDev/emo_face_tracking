@@ -54,7 +54,7 @@ async def websocket_endpoint(
                 continue
 
             # ML Pipeline
-            faces = inference_engine.detect_faces(image)
+            faces = inference_engine.detect_faces(image , threshold=0.3 ) 
             
             if not faces:
                 await manager.send_personal_json({"status": "no_face_detected"}, user.id)
