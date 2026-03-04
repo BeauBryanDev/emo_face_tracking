@@ -94,22 +94,33 @@ async def websocket_endpoint(
             else:
                 
                 consecutive_low_ear_frames = 0
-
-            # Liveness Detection with Multi-layer check
-            liveness_score = inference_engine.check_liveness(face_crop)
+            
             
             # Texture Analysis (Laplacian Variance) - Catch low-res prints/screens
             gray = cv2.cvtColor(face_crop, cv2.COLOR_BGR2GRAY)
             texture_variance = cv2.Laplacian(gray, cv2.CV_64F).var()
             
-            # COMBINED DECISION LOGIC:
-            # 1. Model must be confident (> 0.75)
-            # 2. Texture must be sharp enough (> 70.0) 
-            # Note: Paper prints often have lower variance than real skin or are unnaturally smooth/grainy.
-            is_live = (liveness_score > 0.75) and (texture_variance > 70.0)
-            
-            print(f"Liveness Check | Model: {liveness_score:.4f} | Texture: {texture_variance:.2f} | Final: {is_live}")
+            # Extract EAR from geometry data already computed above
+            ear_value = geometry_data["ear"]["ear"]
 
+            # Liveness check - MiniFASNetV2
+            liveness_score = inference_engine.check_liveness(face_crop)
+
+            # COMBINED ANTI-SPOOFING DECISION
+            # MiniFASNetV2 alone is insufficient for printed photo attacks on
+            # low-resolution laptop cameras (model trained primarily on mobile data).
+            # Second layer: geometric liveness via EAR.
+            #   - Real faces:     EAR > 0.12 (eyes have depth and structure)
+            #   - Printed photos: EAR ~ 0.00 (flat surface, no ocular geometry)
+            # Note: bool() cast required - numpy.bool_ is not JSON serializable.
+            is_live = bool(liveness_score > 0.65 and ear_value > 0.125)
+
+            print(f"Liveness | Model: {liveness_score:.4f} | EAR: {ear_value:.4f} | Final: {is_live}")
+
+            is_live = bool( liveness_score > 0.65 and ear_value > 0.125 )  
+
+            print(f"Liveness Check | Model: {liveness_score:.4f} | Texture: {texture_variance:.2f} | EAR : {ear_value:.4f} | Final: {is_live}")
+    
             response_data = {
                 "status": "success",
                 "bbox": bbox,
@@ -160,8 +171,9 @@ async def websocket_endpoint(
                     )
                     # db thread is separate from the main event loop, so we use run_in_executor to avoid blocking
                     db.add(new_emotion_record)
-                    db.commit()
                     
+                    # DO NOT commit in the main thread, it blocks the WebSocket loop.
+                    # We ONLY use the executor for the commit.
                     await asyncio.get_event_loop().run_in_executor(None, db.commit)
                     
                 except Exception as db_error:
