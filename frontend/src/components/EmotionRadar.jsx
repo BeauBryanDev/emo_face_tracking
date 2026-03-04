@@ -1,24 +1,30 @@
 import React, { useMemo } from 'react';
-import { 
-  Radar, 
-  RadarChart, 
-  PolarGrid, 
-  PolarAngleAxis, 
-  PolarRadiusAxis, 
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
   ResponsiveContainer,
   Tooltip
 } from 'recharts';
 
-// Componente de Tooltip personalizado estilo terminal Cyberpunk
+/**
+ * CUSTOM HUD TOOLTIP
+ * Styled as a floating terminal fragment
+ */
 const CustomTooltip = ({ active, payload }) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-purple-950/90 border border-neon-purple p-2 shadow-neon-sm font-mono text-xs">
-        <p className="text-purple-200 uppercase tracking-wider border-b border-purple-800 pb-1 mb-1">
-          {payload[0].payload.subject}
-        </p>
-        <p className="text-neon-purple font-bold">
-          CONFIDENCE: {(payload[0].value * 100).toFixed(2)}%
+      <div className="bg-purple-950/95 border-l-2 border-neon-purple p-3 backdrop-blur-md shadow-[0_0_20px_rgba(170,0,255,0.3)] animate-in fade-in zoom-in duration-200">
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-1.5 h-1.5 bg-neon-purple animate-pulse" />
+          <p className="text-purple-200 font-display text-[10px] font-bold tracking-widest">
+            {payload[0].payload.subject} // NEURAL_INDEX
+          </p>
+        </div>
+        <p className="text-neon-purple font-mono text-xs font-black shadow-neon-sm">
+          INTENSITY: {(payload[0].value * 100).toFixed(1)}%
         </p>
       </div>
     );
@@ -26,21 +32,34 @@ const CustomTooltip = ({ active, payload }) => {
   return null;
 };
 
-const EmotionRadar = ({ emotionScores }) => {
-  // Memoizamos la transformación de datos para evitar re-renderizados costosos
-  // Convertimos el diccionario { "Happiness": 0.9, ... } a un array compatible con Recharts
-  const data = useMemo(() => {
-    if (!emotionScores || Object.keys(emotionScores).length === 0) {
-      // Estado de espera (radar vacío) si no hay datos del WebSocket
-      return [
-        { subject: 'ANG', A: 0, fullMark: 1 }, { subject: 'CON', A: 0, fullMark: 1 },
-        { subject: 'DIS', A: 0, fullMark: 1 }, { subject: 'FEA', A: 0, fullMark: 1 },
-        { subject: 'HAP', A: 0, fullMark: 1 }, { subject: 'NEU', A: 0, fullMark: 1 },
-        { subject: 'SAD', A: 0, fullMark: 1 }, { subject: 'SUR', A: 0, fullMark: 1 },
-      ];
-    }
+/**
+ * NEON VERTEX DOT
+ * Custom dot component for vertex glow
+ */
+const RenderCustomDot = (props) => {
+  const { cx, cy, payload, value } = props;
+  if (value < 0.05) return null; // Don't show if intensity is negligible
 
-    // Acrónimos tácticos para mantener el diseño del radar limpio y militar
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={4} fill="#bf00ff" filter="url(#vertexGlow)" />
+      <circle cx={cx} cy={cy} r={2} fill="#f0ccff" />
+    </g>
+  );
+};
+
+const EmotionRadar = ({ emotionScores }) => {
+  // Transform scores into HUD-compatible data
+  const data = useMemo(() => {
+    const defaultData = [
+      { subject: 'ANG', A: 0 }, { subject: 'CON', A: 0 },
+      { subject: 'DIS', A: 0 }, { subject: 'FEA', A: 0 },
+      { subject: 'HAP', A: 0 }, { subject: 'NEU', A: 0 },
+      { subject: 'SAD', A: 0 }, { subject: 'SUR', A: 0 },
+    ];
+
+    if (!emotionScores || Object.keys(emotionScores).length === 0) return defaultData;
+
     const labels = {
       "Anger": "ANG", "Contempt": "CON", "Disgust": "DIS", "Fear": "FEA",
       "Happiness": "HAP", "Neutral": "NEU", "Sadness": "SAD", "Surprise": "SUR"
@@ -48,62 +67,144 @@ const EmotionRadar = ({ emotionScores }) => {
 
     return Object.keys(emotionScores).map(key => ({
       subject: labels[key] || key.substring(0, 3).toUpperCase(),
-      A: emotionScores[key], // La probabilidad real de 0.0 a 1.0
-      fullMark: 1,
+      A: emotionScores[key],
     }));
   }, [emotionScores]);
 
   return (
-    <div className="w-full h-full min-h-[250px] relative flex flex-col items-center justify-center bg-surface-1 border border-purple-800 shadow-[inset_0_0_30px_rgba(74,0,128,0.3)]">
-      
-      {/* Etiqueta superior del módulo */}
-      <div className="absolute top-2 left-3 text-purple-400 font-mono text-[10px] tracking-widest z-10">
-        SYS.RADAR.MULTIVARIATE
+    <div className="w-full h-full min-h-[280px] relative flex flex-col items-center justify-center bg-surface-1/40 border border-purple-900/50 overflow-hidden group">
+
+      {/* HUD CORNER ACCENTS */}
+      <div className="absolute top-0 left-0 w-8 h-8 border-t border-l border-purple-500/30 transition-all group-hover:border-neon-purple/60" />
+      <div className="absolute top-0 right-0 w-8 h-8 border-t border-r border-purple-500/30 transition-all group-hover:border-neon-purple/60" />
+      <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-purple-500/30 transition-all group-hover:border-neon-purple/60" />
+      <div className="absolute bottom-0 right-0 w-8 h-8 border-b border-r border-purple-500/30 transition-all group-hover:border-neon-purple/60" />
+
+      {/* BACKGROUND SCANNING GRID LINES */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none overflow-hidden">
+        <div className="absolute inset-0 bg-cyber-grid bg-[length:20px_20px]" />
+        <div className="absolute w-full h-[1px] bg-neon-purple/40 top-0 animate-[scan_4s_linear_infinite]" />
       </div>
 
-      <ResponsiveContainer width="100%" aspect={1.4}>  {/* before height was 100% */}
-        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={data}>
-          
-          {/* Definición del gradiente SVG para el brillo tridimensional */}
+      {/* MODULE HEADER */}
+      <div className="absolute top-3 left-4 flex flex-col gap-0.5 z-10">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-0.5 bg-neon-purple" />
+          <span className="text-purple-400 font-mono text-[9px] tracking-[0.3em] font-bold">
+            NEURALCORE.RADAR_V4
+          </span>
+        </div>
+        <span className="text-purple-600 font-mono text-[7px] pl-4">STATUS: ANALYZING_STREAM</span>
+      </div>
+
+      <ResponsiveContainer width="100%" height="90%">
+        <RadarChart cx="50%" cy="50%" outerRadius="65%" data={data}>
+
           <defs>
-            <radialGradient id="neonGlow" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-              <stop offset="0%" stopColor="#bf00ff" stopOpacity={0.8} />
-              <stop offset="100%" stopColor="#4a0080" stopOpacity={0.2} />
+            {/* Primary Energy Fill */}
+            <radialGradient id="energyFill" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+              <stop offset="0%" stopColor="#bf00ff" stopOpacity={0.6} />
+              <stop offset="90%" stopColor="#7a00cc" stopOpacity={0.15} />
+              <stop offset="100%" stopColor="#4b0082" stopOpacity={0.05} />
             </radialGradient>
-            <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-              <feGaussianBlur stdDeviation="4" result="blur" />
+
+            {/* Polygon Glow Filter */}
+            <filter id="neonBlur" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="3.5" result="blur" />
               <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+
+            {/* Vertex Glow */}
+            <filter id="vertexGlow">
+              <feGaussianBlur stdDeviation="2" result="blur" />
+              <feFlood floodColor="#bf00ff" result="color" />
+              <feComposite in="color" in2="blur" operator="in" />
+              <feMerge>
+                <feMergeNode />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
             </filter>
           </defs>
 
-          {/* La telaraña polar (grilla del radar) */}
-          <PolarGrid stroke="#4a0080" strokeDasharray="3 3" />
-          
-          {/* Ejes radiales (Texto) */}
-          <PolarAngleAxis 
-            dataKey="subject" 
-            tick={{ fill: '#aa00ff', fontSize: 10, fontFamily: 'Share Tech Mono', fontWeight: 'bold' }} 
+          {/* POLAR GRID - TARGETING RETICLE STYLE */}
+          <PolarGrid
+            stroke="#6b21a8"
+            strokeOpacity={0.3}
+            strokeDasharray="4 2"
+            polarAngles={[0, 45, 90, 135, 180, 225, 270, 315]}
           />
-          
-          {/* Eje de magnitud (invisible, solo para forzar la escala de 0 a 1) */}
-          <PolarRadiusAxis angle={30} domain={[0, 1]} tick={false} axisLine={false} />
-          
-          <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#aa00ff', strokeWidth: 1 }} />
-          
-          {/* El polígono de datos */}
+
+          {/* LABELS */}
+          <PolarAngleAxis
+            dataKey="subject"
+            tick={{
+              fill: '#d8b4fe',
+              fontSize: 10,
+              fontFamily: 'Share Tech Mono',
+              fontWeight: 900,
+              letterSpacing: '0.1em'
+            }}
+          />
+
+          <PolarRadiusAxis
+            domain={[0, 1]}
+            tick={false}
+            axisLine={{ stroke: '#6b21a8', strokeOpacity: 0.2 }}
+          />
+
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#bf00ff', strokeWidth: 1 }} />
+
+          {/* GHOST / AMBIENT LAYER & INNER SHADOW */}
+          <Radar
+            dataKey="A"
+            stroke="none"
+            fill="#7a00cc"
+            fillOpacity={0.1}
+            isAnimationActive={false}
+          />
+
+          {/* ACTION LAYER - NEON EDGE */}
           <Radar
             name="Emotions"
             dataKey="A"
             stroke="#bf00ff"
             strokeWidth={2}
-            fill="url(#neonGlow)"
-            fillOpacity={1}
-            filter="url(#glow)" /* Aplica el filtro de neón al polígono */
+            fill="url(#energyFill)"
+            fillOpacity={0.8}
+            dot={<RenderCustomDot />}
+            filter="url(#neonBlur)"
             isAnimationActive={true}
-            animationDuration={300} /* Animación rápida para sentir el Real-Time */
+            animationDuration={400}
+            animationEasing="ease-out"
           />
         </RadarChart>
       </ResponsiveContainer>
+
+      {/* FOOTER DATA STREAM (Decorative) */}
+      <div className="absolute bottom-2 right-3 flex items-center gap-4 opacity-40 pointer-events-none">
+        <div className="flex flex-col items-end">
+          <div className="h-1 w-12 bg-purple-900 rounded-full overflow-hidden">
+            <div className="h-full bg-neon-purple w-2/3 animate-[loading_2s_infinite]" />
+          </div>
+          <span className="text-[6px] text-purple-400 font-mono mt-0.5 uppercase">Syncing...</span>
+        </div>
+        <div className="font-mono text-[8px] text-purple-500 border-l border-purple-800/50 pl-2">
+          MTX_PROT: V3.2
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes scan {
+          0% { transform: translateY(-100%); opacity: 0; }
+          10% { opacity: 0.4; }
+          90% { opacity: 0.4; }
+          100% { transform: translateY(300px); opacity: 0; }
+        }
+        @keyframes loading {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
     </div>
   );
 };

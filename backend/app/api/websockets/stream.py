@@ -113,9 +113,9 @@ async def websocket_endpoint(
             #   - Real faces:     EAR > 0.12 (eyes have depth and structure)
             #   - Printed photos: EAR ~ 0.00 (flat surface, no ocular geometry)
             # Note: bool() cast required - numpy.bool_ is not JSON serializable.
-            is_live = bool(liveness_score > 0.65 and ear_value > 0.125)
+            is_live = bool(liveness_score > 0.65 and ear_value > 0.125 and texture_variance > 70 )
 
-            print(f"Liveness | Model: {liveness_score:.4f} | EAR: {ear_value:.4f} | Final: {is_live}")
+            #print(f"Liveness | Model: {liveness_score:.4f} | EAR: {ear_value:.4f} | Final: {is_live}")
 
             is_live = bool( liveness_score > 0.65 and ear_value > 0.125 )  
 
