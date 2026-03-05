@@ -12,7 +12,7 @@ export const BiometricsProvider = ({ children }) => {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    setHasEmbedding(Boolean(user?.face_embedding))
+    setHasEmbedding(Boolean(user?.has_embedding))
   }, [user])
 
   const refreshStatus = async () => {
@@ -20,7 +20,7 @@ export const BiometricsProvider = ({ children }) => {
     setError(null)
     try {
       const data = await getCurrentUser()
-      setHasEmbedding(Boolean(data?.face_embedding))
+      setHasEmbedding(Boolean(data?.has_embedding))
       return data
     } catch (e) {
       setError('FAILED TO REFRESH BIOMETRICS')
@@ -81,5 +81,6 @@ export const useBiometrics = () => {
   if (!ctx) throw new Error('useBiometrics must be used within BiometricsProvider')
   return ctx
 }
+
 
 export default BiometricsContext

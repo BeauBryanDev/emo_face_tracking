@@ -5,16 +5,11 @@ import sys
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List, Optional, Union
 from app.core.config import settings
 
 # --- Logging Configuration ---
 
-# Keep the original Docker-oriented path by default.
-# In containers, /app is usually the working directory with a mounted volume.
-# For tests (where lifespan is overridden), this module will be imported
-# but we won't actually create the directory or file unless setup_logging()
-# is called, avoiding PermissionError in CI.
 LOG_DIR      = Path("/app/logs")
 LOG_FILE     = LOG_DIR / "app.log"
 LOG_LEVEL    = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -24,6 +19,27 @@ ENVIRONMENT  = os.getenv("ENVIRONMENT", "development")
 LOG_MAX_BYTES =  10 * 1024 * 1024  # 10 MB
 LOG_BACKUPS   =   5
 LOG_BACKUP_COUNT =  5
+
+# Create log directory if it doesn't exist
+if not LOG_DIR.exists():
+    LOG_DIR.mkdir(parents=True)
+
+# Create log file if it doesn't exist
+if not LOG_FILE.exists():
+    LOG_FILE.touch()
+
+# Set log file size limit
+handler = logging.handlers.RotatingFileHandler(
+    LOG_FILE,
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=LOG_BACKUPS
+)
+
+# Set log file format
+formatter = logging.Formatter(
+    fmt="%(asctime)s [%(levelname)s] %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S"
+)
 
 class DevFormatter(logging.Formatter):
     
@@ -83,12 +99,15 @@ class JSONFormatter(logging.Formatter):
         
         
         if hasattr(record, "user_id"):
+            
             log_entry["user_id"] = record.user_id
 
         if hasattr(record, "endpoint"):
+            
             log_entry["endpoint"] = record.endpoint
 
         if hasattr(record, "duration_ms"):
+            
             log_entry["duration_ms"] = record.duration_ms
 
         # Excepcion con traceback completo para CloudWatch
@@ -116,18 +135,15 @@ def setup_logging() -> None:
 
     """
     
-    try:
-        LOG_DIR.mkdir(parents=True, exist_ok=True)
-    except PermissionError:
-        # If the directory cannot be created (e.g. read-only filesystem),
-        # we will gracefully fall back to stdout-only logging below.
-        pass
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
 
     # Elegir formatter segun entorno
-    formatter: logging.Formatter
     if ENVIRONMENT == "production":
+        
         formatter = JSONFormatter()
+        
     else:
+        
         formatter = DevFormatter()
 
     # Nivel de log
@@ -142,27 +158,36 @@ def setup_logging() -> None:
     # --- Handler 2: archivo rotativo ---
     # /app/logs/app.log montado como volumen ./logs en tu maquina
     try:
+        
         file_handler = logging.handlers.RotatingFileHandler(
             filename    = LOG_FILE,
             maxBytes    = LOG_MAX_BYTES,
             backupCount = LOG_BACKUP_COUNT,
+            
             encoding    = "utf-8"
         )
         file_handler.setLevel(numeric_level)
         file_handler.setFormatter(formatter)
-        handlers: list[logging.Handler] = [stream_handler, file_handler]
+        
+        handlers = [stream_handler, file_handler]
+        
     except PermissionError:
+        
         # Si el directorio no esta montado correctamente en el contenedor
         # continua solo con stdout para no romper el arranque
         handlers = [stream_handler]
+        
         logging.warning(
+            
             f"No se pudo crear el archivo de log en {LOG_FILE}. "
             f"Verifica el volumen en docker-compose.yml. "
             f"Continuando solo con stdout."
         )
 
     # Configurar root logger
+    
     logging.basicConfig(
+        
         level    = numeric_level,
         handlers = handlers,
         force    = True   # fuerza reemplazar handlers previos (uvicorn los setea primero)
@@ -178,7 +203,9 @@ def setup_logging() -> None:
 
     # Log de confirmacion de arranque
     logger = logging.getLogger(__name__)
+    
     logger.info(
+        
         f"Logging inicializado. "
         f"env={ENVIRONMENT}  level={LOG_LEVEL}  "
         f"file={LOG_FILE}"

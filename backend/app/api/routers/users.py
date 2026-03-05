@@ -10,6 +10,8 @@ from app.models.users import User
 from app.schemas.user_schema import UserResponse , UserUpdate , UserCreate
 from app.services.inference_engine import inference_engine
 from app.utils.image_processing import align_face, prepare_tensor_for_onnx
+from app.services.face_math import compute_cosine_similarity, verify_biometric_match, apply_pca_reduction
+
 
 router = APIRouter()
 
@@ -70,7 +72,7 @@ def update_current_user(
     
     return current_user 
 
-@router.post("/me/face_embedding", status_code=status.HTTP_200_OK)
+@router.post("/me/face_embedding", status_code=status.HTTP_200_OK,  response_model=UserResponse)
 def update_face_embedding(
     current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
@@ -98,7 +100,7 @@ def update_face_embedding(
     return current_user
 
 
-@router.delete("/me/face_embedding", status_code=status.HTTP_200_OK)
+@router.delete("/me/face_embedding", status_code=status.HTTP_200_OK, response_model=UserResponse)
 def delete_face_embedding(
     
     current_user: User = Depends(get_current_active_user),
@@ -240,3 +242,110 @@ async def register_biometrics(
         )
 
     return {"message": "Biometric master template successfully registered."}
+
+# POST /api/v1/users/me/verify
+# Biometric identity verification before sensitive profile changes.
+@router.post("/me/verify", status_code=status.HTTP_200_OK)
+async def verify_biometric_identity(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Verifies the identity of the authenticated user via face recognition.
+
+    Pipeline:
+        1. Validate image format
+        2. Detect face with SCRFD
+        3. Liveness check with MiniFASNetV2 + EAR guard
+        4. Align face with affine transform
+        5. Extract 512D embedding with ArcFace w600k_mbf
+        6. Compare with stored master template via cosine similarity
+
+    Args:
+        file: Live image captured from the webcam (JPEG/PNG).
+
+    Returns:
+        dict with is_match (bool), similarity (float), and liveness score.
+
+    Raises:
+        403 if user has no biometric template enrolled.
+        400 if no face detected or image is invalid.
+        403 if liveness check fails (spoofing attempt).
+    """
+    # 1. User must have a stored template to compare against
+    if current_user.face_embedding is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="No biometric template enrolled. Please register your face first.",
+        )
+
+    # 2. Validate file format
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File provided is not an image.",
+        )
+
+    # 3. Decode image
+    contents = await file.read()
+    nparr    = np.frombuffer(contents, np.uint8)
+    image    = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    if image is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to decode the image. The file may be corrupted.",
+        )
+
+    # 4. Face detection
+    faces = inference_engine.detect_faces(image, threshold=0.3)
+
+    if len(faces) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No face detected in the image. Please ensure good lighting.",
+        )
+
+    primary_face = faces[0]
+    bbox         = primary_face.get("bbox")
+    landmarks    = primary_face.get("landmarks")
+
+    # 5. Crop face for liveness check
+    img_h, img_w   = image.shape[:2]
+    x1, y1, x2, y2 = map(int, bbox)
+    x1, y1 = max(0, x1), max(0, y1)
+    x2, y2 = min(img_w, x2), min(img_h, y2)
+    face_crop = image[y1:y2, x1:x2]
+
+    if face_crop.size == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid face crop. Please try again.",
+        )
+
+    # 6. Liveness check - MiniFASNetV2
+    liveness_score = inference_engine.check_liveness(face_crop)
+    if liveness_score < 0.65:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Liveness check failed (score: {liveness_score:.2f}). Please use a live capture.",
+        )
+
+    # 7. Align face and extract 512D embedding
+    aligned_face_bgr = align_face(image, landmarks)
+    aligned_face_rgb = cv2.cvtColor(aligned_face_bgr, cv2.COLOR_BGR2RGB)
+    live_vector      = inference_engine.get_face_embedding(aligned_face_rgb)
+
+    # 8. Compare against stored master template
+    stored_vector        = np.array(current_user.face_embedding, dtype=np.float32)
+    is_match, similarity = verify_biometric_match(stored_vector, live_vector)
+
+    return {
+        "is_match":       bool(is_match),
+        "similarity":     round(float(similarity), 4),
+        "liveness_score": round(float(liveness_score), 4),
+        "message":        "Identity verified." if is_match else "Identity could not be verified.",
+    }
+    
+    

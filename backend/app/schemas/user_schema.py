@@ -31,6 +31,7 @@ class UserResponse(UserBase):
     """
     id: int
     is_active: bool
+    has_embedding: bool = False
     created_at: datetime
     updated_at: Optional[datetime] = None
 

@@ -37,3 +37,16 @@ export const refreshFaceEmbedding = async () => {
   const response = await api.post('/users/me/face_embedding')
   return response.data
 }
+/**
+ * Verifies biometric identity before sensitive profile changes.
+ * Sends a live webcam capture and compares against stored template.
+ * @param {File} imageFile - Live capture from webcam
+ */
+export const verifyBiometrics = async (imageFile) => {
+  const formData = new FormData()
+  formData.append('file', imageFile)
+  const response = await api.post('/users/me/verify', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return response.data
+}
