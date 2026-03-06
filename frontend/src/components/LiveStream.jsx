@@ -1,12 +1,9 @@
-import React, { useEffect } from 'react';
-import { Activity, ShieldCheck, ShieldAlert, Eye, Zap, AlertTriangle, Cpu } from 'lucide-react';
+import React, { useEffect, useMemo, useCallback, useState } from 'react';
+import { Activity, ShieldCheck, ShieldAlert, Eye, AlertTriangle, Cpu } from 'lucide-react';
 import { useFaceTracking } from '../hooks/useFaceTracking';
 import EmotionRadar from './EmotionRadar';
-
-import { useState } from 'react'
 import { saveEmotion } from '../api/emotions'
 import { INFERENCE_FRAME } from '../config/inference'
-
 
 
 const LiveStream = () => {
@@ -21,49 +18,62 @@ const LiveStream = () => {
     };
   }, [startCamera, stopCamera]);
 
-  //  Secure JSON Structure Extraction 
-  const hasFace = results?.status === "success";
-  const bbox = hasFace ? results.bbox : null;
-  const emotion = hasFace ? results.emotion?.dominant_emotion : "SCANNING...";
-  const emotionScores = hasFace ? results.emotion?.emotion_scores : null;
-  const liveness = hasFace ? results.liveness : null;
-  const eyeState = hasFace ? results.geometry?.ear?.eye_state : null;
-  const isDrowsy = hasFace ? results.geometry?.ear?.is_drowsy : false;
-  const headPose = hasFace ? results.geometry?.head_pose?.pose_label : null;
+  // Secure JSON structure extraction - memoized to avoid repeated derived work.
+  const {
+    hasFace,
+    bbox,
+    emotion,
+    emotionScores,
+    liveness,
+    eyeState,
+    isDrowsy,
+    headPose,
+  } = useMemo(() => {
+    const faceDetected = results?.status === 'success'
+    return {
+      hasFace: faceDetected,
+      bbox: faceDetected ? results.bbox : null,
+      emotion: faceDetected ? results.emotion?.dominant_emotion : 'SCANNING...',
+      emotionScores: faceDetected ? results.emotion?.emotion_scores : null,
+      liveness: faceDetected ? results.liveness : null,
+      eyeState: faceDetected ? results.geometry?.ear?.eye_state : null,
+      isDrowsy: faceDetected ? results.geometry?.ear?.is_drowsy : false,
+      headPose: faceDetected ? results.geometry?.head_pose?.pose_label : null,
+    }
+  }, [results])
  
   const FRAME_WIDTH = INFERENCE_FRAME.width
   const FRAME_HEIGHT = INFERENCE_FRAME.height
 
 
-  // Bounding box Tensor X3D  Transform
-    const getBBoxStyles = () => {
-    if (!bbox) return { display: 'none' };
-    const [x1, y1, x2, y2] = bbox;
+  const bboxStyles = useMemo(() => {
+    if (!bbox) return { display: 'none' }
+    const [x1, y1, x2, y2] = bbox
     return {
       left: `${(x1 / FRAME_WIDTH) * 100}%`,
       top: `${(y1 / FRAME_HEIGHT) * 100}%`,
       width: `${((x2 - x1) / FRAME_WIDTH) * 100}%`,
       height: `${((y2 - y1) / FRAME_HEIGHT) * 100}%`,
-    };
-  };
+    }
+  }, [bbox, FRAME_WIDTH, FRAME_HEIGHT])
 
 
-  const handleSaveEmotion = async () => {
-  if (!hasFace || !liveness?.is_live || !results?.emotion) return
-  setSaveStatus('SAVING')
-  try {
-    await saveEmotion({
-      dominant_emotion: results.emotion.dominant_emotion,
-      confidence:       results.emotion.confidence,
-      emotion_scores:   results.emotion.emotion_scores ?? null,
-    })
-    setSaveStatus('SAVED')
-    setTimeout(() => setSaveStatus('IDLE'), 2000)
-  } catch (error) {
-    setSaveStatus('ERROR')
-    setTimeout(() => setSaveStatus('IDLE'), 2000)
-  } 
-}
+  const handleSaveEmotion = useCallback(async () => {
+    if (!hasFace || !liveness?.is_live || !results?.emotion) return
+    setSaveStatus('SAVING')
+    try {
+      await saveEmotion({
+        dominant_emotion: results.emotion.dominant_emotion,
+        confidence: results.emotion.confidence,
+        emotion_scores: results.emotion.emotion_scores ?? null,
+      })
+      setSaveStatus('SAVED')
+      setTimeout(() => setSaveStatus('IDLE'), 2000)
+    } catch (_error) {
+      setSaveStatus('ERROR')
+      setTimeout(() => setSaveStatus('IDLE'), 2000)
+    }
+  }, [hasFace, liveness?.is_live, results])
 
 const EMOTION_ADJECTIVES = {
   Happiness: 'Happy',
@@ -123,7 +133,7 @@ const emotionAdjective = EMOTION_ADJECTIVES[emotion] ?? emotion
           {hasFace && (
             <div 
               className={`absolute z-20 border-2 transition-all duration-75 ease-linear ${liveness?.is_live ? 'border-neon-purple shadow-neon-sm' : 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.8)]'}`}
-              style={getBBoxStyles()}
+              style={bboxStyles}
             >
               {/* CORNERS */}
               <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-purple-100"></div>

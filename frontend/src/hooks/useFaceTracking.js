@@ -16,12 +16,10 @@ export const useFaceTracking = () => {
   const wsRef = useRef(null)
   const streamRef = useRef(null)
   const canvasRef = useRef(document.createElement('canvas'))
-  const rafRef = useRef(null)
   const waitingRef = useRef(false)
-  const lastSentAtRef = useRef(0)
   const mountedRef = useRef(true)
-
-  const intervalRef = useRef(null)
+  const latestResultRef = useRef(null)
+  const hasPendingResultRef = useRef(false)
 
 
   const safeSet = useCallback((setter, value) => {
@@ -56,7 +54,7 @@ export const useFaceTracking = () => {
       stopCamera()
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, frameRate: { ideal: 10, max: 15 } },
+        video: { width: 640, height: 480, frameRate: { ideal: 10, max: 10 } },
       })
 
       if (!mountedRef.current) {
@@ -86,16 +84,18 @@ export const useFaceTracking = () => {
   }, [safeSet, stopCamera])
 
   useEffect(() => {
+
     mountedRef.current = true
+
     return () => {
+
       mountedRef.current = false
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
       stopCamera()
+
       const ws = wsRef.current
+
       if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+        
         ws.close()
       }
       wsRef.current = null
@@ -123,7 +123,8 @@ export const useFaceTracking = () => {
       if (cancelled) return
       waitingRef.current = false
       try {
-        safeSet(setResults, JSON.parse(event.data))
+        latestResultRef.current = JSON.parse(event.data)
+        hasPendingResultRef.current = true
       } catch {
         safeSet(setError, 'INVALID STREAM PAYLOAD')
       }
@@ -154,15 +155,29 @@ export const useFaceTracking = () => {
     }
   }, [token, safeSet])
 
+  // Throttle UI commits to reduce full component tree re-renders.
+  useEffect(() => {
+    const UI_COMMIT_MS = 150
+    const uiTimer = setInterval(() => {
+      if (!hasPendingResultRef.current) return
+      hasPendingResultRef.current = false
+      safeSet(setResults, latestResultRef.current)
+    }, UI_COMMIT_MS)
+
+    return () => clearInterval(uiTimer)
+  }, [safeSet])
+
   // Frame capture loop.
   useEffect(() => {
     if (!isConnected || !videoReady) return
 
     const intervalMs = INFERENCE_FRAME.intervalMs
     let encoding = false
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
 
     const interval = setInterval(() => {
-
       if (waitingRef.current || encoding) return
 
       const ws = wsRef.current
@@ -176,18 +191,12 @@ export const useFaceTracking = () => {
         video.videoWidth > 0 &&
         video.videoHeight > 0
       ) {
-        const canvas = canvasRef.current
-
         const TARGET_WIDTH = INFERENCE_FRAME.width
         const TARGET_HEIGHT = INFERENCE_FRAME.height
 
 
         canvas.width = TARGET_WIDTH
         canvas.height = TARGET_HEIGHT
-
-        const ctx = canvas.getContext('2d')
-
-        if (!ctx) return
 
         ctx.drawImage(video, 0, 0, TARGET_WIDTH, TARGET_HEIGHT)
 
