@@ -10,9 +10,9 @@ import Footer from '../components/common/Footer'
 // -----------------------------------------------------------------------------
 const NAV_ITEMS = [
   {
-    path:  '/dashboard',
+    path: '/dashboard',
     label: 'LIVE STREAM',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <circle cx="12" cy="12" r="3" />
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
@@ -21,9 +21,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path:  '/inference',
+    path: '/inference',
     label: 'INFERENCE',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M4 12h16" />
         <path d="M12 4v16" />
@@ -32,9 +32,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path:  '/history',
+    path: '/history',
     label: 'HISTORY',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v6l4 2" />
@@ -42,9 +42,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path:  '/emotions',
+    path: '/emotions',
     label: 'EMOTION LOG',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M3 3h18v14H3z" />
         <path d="M7 17l5-5 3 3 4-6" />
@@ -52,9 +52,9 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path:  '/analytics',
+    path: '/analytics',
     label: 'ANALYTICS',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <path d="M4 19V5" />
         <path d="M10 19V9" />
@@ -64,12 +64,23 @@ const NAV_ITEMS = [
     ),
   },
   {
-    path:  '/profile',
+    path: '/profile',
     label: 'OPERATOR PROFILE',
-    icon:  (
+    icon: (
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
         <circle cx="12" cy="8" r="4" />
         <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+      </svg>
+    ),
+  },
+  {
+    path: '/about',
+    label: 'ABOUT SYSTEM',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12.01" y2="8" />
       </svg>
     ),
   },
@@ -80,7 +91,7 @@ const NAV_ITEMS = [
 // -----------------------------------------------------------------------------
 const Sidebar = () => {
   const { user, logout } = useAuth()
-  const navigate         = useNavigate()
+  const navigate = useNavigate()
 
   const handleLogout = () => {
     logout()
@@ -277,16 +288,16 @@ const Sidebar = () => {
             transition: 'all 0.2s',
           }}
           onMouseEnter={(e) => {
-            e.target.style.background  = 'rgba(255,0,80,0.1)'
+            e.target.style.background = 'rgba(255,0,80,0.1)'
             e.target.style.borderColor = 'rgba(255,0,80,0.5)'
-            e.target.style.color       = 'rgba(255,80,120,0.9)'
-            e.target.style.boxShadow   = '0 0 12px rgba(255,0,80,0.15)'
+            e.target.style.color = 'rgba(255,80,120,0.9)'
+            e.target.style.boxShadow = '0 0 12px rgba(255,0,80,0.15)'
           }}
           onMouseLeave={(e) => {
-            e.target.style.background  = 'transparent'
+            e.target.style.background = 'transparent'
             e.target.style.borderColor = 'rgba(255,0,80,0.25)'
-            e.target.style.color       = 'rgba(255,80,120,0.6)'
-            e.target.style.boxShadow   = 'none'
+            e.target.style.color = 'rgba(255,80,120,0.6)'
+            e.target.style.boxShadow = 'none'
           }}
         >
           DISCONNECT

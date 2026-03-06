@@ -9,54 +9,75 @@ import { registerUser } from '../api/auth'
 // -----------------------------------------------------------------------------
 const FIELDS = [
   {
-    name:        'full_name',
-    label:       'OPERATOR NAME',
+    name: 'full_name',
+    label: 'OPERATOR NAME',
     placeholder: 'John Doe',
-    type:        'text',
-    autoComplete:'name',
+    type: 'text',
+    autoComplete: 'name',
   },
   {
-    name:        'email',
-    label:       'IDENTITY / EMAIL',
+    name: 'email',
+    label: 'IDENTITY / EMAIL',
     placeholder: 'user@domain.net',
-    type:        'email',
-    autoComplete:'email',
+    type: 'email',
+    autoComplete: 'email',
   },
   {
-    name:        'age',
-    label:       'AGE / CYCLES',
+    name: 'phone',
+    label: 'PHONE',
+    placeholder: '+1 (123) 456-7890',
+    type: 'tel',
+    autoComplete: 'tel',
+  },
+  {
+    name: 'country',
+    label: 'COUNTRY',
+    placeholder: 'United States',
+    type: 'text',
+    autoComplete: 'off',
+  },
+  {
+    name: 'age',
+    label: 'AGE / CYCLES',
     placeholder: '25',
-    type:        'number',
-    autoComplete:'off',
-    min:         1,
-    max:         120,
+    type: 'number',
+    autoComplete: 'off',
+    min: 1,
+    max: 120,
   },
   {
-    name:        'password',
-    label:       'CIPHER / PASSWORD',
-    placeholder: '••••••••••••',
-    type:        'password',
-    autoComplete:'new-password',
+    name: 'gender',
+    label: 'GENDER',
+    placeholder: 'Male',
+    type: 'text',
+    autoComplete: 'off',
   },
   {
-    name:        'confirm_password',
-    label:       'CONFIRM CIPHER',
+    name: 'password',
+    label: 'CIPHER / PASSWORD',
     placeholder: '••••••••••••',
-    type:        'password',
-    autoComplete:'new-password',
+    type: 'password',
+    autoComplete: 'new-password',
+  },
+  {
+    name: 'confirm_password',
+    label: 'CONFIRM CIPHER',
+    placeholder: '••••••••••••',
+    type: 'password',
+    autoComplete: 'new-password',
   },
 ]
 
 const Register = () => {
-  const navigate  = useNavigate()
+  const navigate = useNavigate()
   const { login } = useAuth()
 
-  const [form, setForm]       = useState({
+  const [form, setForm] = useState({
     full_name: '', email: '', age: '', password: '', confirm_password: '',
   })
   const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
-  const [phase, setPhase]     = useState('IDLE')
+  const [error, setError] = useState(null)
+  const [phase, setPhase] = useState('IDLE')
   const [focusedField, setFocusedField] = useState(null)
 
   const handleChange = (e) => {
@@ -67,9 +88,9 @@ const Register = () => {
 
   const validate = () => {
     if (!form.full_name.trim()) return 'OPERATOR NAME REQUIRED'
-    if (!form.email.trim())     return 'IDENTITY EMAIL REQUIRED'
+    if (!form.email.trim()) return 'IDENTITY EMAIL REQUIRED'
     if (!form.age || form.age < 1) return 'VALID AGE REQUIRED'
-    if (form.password.length < 8)  return 'CIPHER MUST BE 8+ CHARACTERS'
+    if (form.password.length < 8) return 'CIPHER MUST BE 8+ CHARACTERS'
     if (form.password !== form.confirm_password) return 'CIPHERS DO NOT MATCH'
     return null
   }
@@ -89,9 +110,9 @@ const Register = () => {
     try {
       await registerUser({
         full_name: form.full_name.trim(),
-        email:     form.email.trim(),
-        age:       parseInt(form.age),
-        password:  form.password,
+        email: form.email.trim(),
+        age: parseInt(form.age),
+        password: form.password,
       })
 
       setPhase('AUTHENTICATING')
@@ -110,10 +131,10 @@ const Register = () => {
 
   const getPhaseLabel = () => {
     switch (phase) {
-      case 'REGISTERING':    return 'REGISTERING NODE...'
+      case 'REGISTERING': return 'REGISTERING NODE...'
       case 'AUTHENTICATING': return 'AUTHENTICATING...'
-      case 'SUCCESS':        return 'NODE REGISTERED'
-      default:               return 'AWAITING INPUT'
+      case 'SUCCESS': return 'NODE REGISTERED'
+      default: return 'AWAITING INPUT'
     }
   }
 
@@ -215,13 +236,12 @@ const Register = () => {
                 background: focusedField === field.name
                   ? 'rgba(45,0,87,0.5)'
                   : 'rgba(45,0,87,0.3)',
-                border: `1px solid ${
-                  error && !form[field.name]
+                border: `1px solid ${error && !form[field.name]
                     ? 'rgba(255,0,100,0.5)'
                     : focusedField === field.name
                       ? 'rgba(204,68,255,0.8)'
                       : 'rgba(170,0,255,0.3)'
-                }`,
+                  }`,
                 color: '#f0ccff',
                 fontFamily: 'Share Tech Mono, monospace',
                 fontSize: '0.85rem',
@@ -242,16 +262,16 @@ const Register = () => {
           <div style={{ display: 'flex', gap: '4px', marginTop: '-0.5rem' }}>
             {[1, 2, 3, 4].map((level) => {
               const strength = Math.min(4, Math.floor(form.password.length / 3))
-              const active   = level <= strength
+              const active = level <= strength
               return (
                 <div key={level} style={{
                   flex: 1,
                   height: '2px',
                   background: active
                     ? level <= 1 ? 'rgba(255,0,80,0.8)'
-                    : level <= 2 ? 'rgba(255,140,0,0.8)'
-                    : level <= 3 ? 'rgba(170,0,255,0.8)'
-                    :              'rgba(0,255,136,0.8)'
+                      : level <= 2 ? 'rgba(255,140,0,0.8)'
+                        : level <= 3 ? 'rgba(170,0,255,0.8)'
+                          : 'rgba(0,255,136,0.8)'
                     : 'rgba(170,0,255,0.15)',
                   boxShadow: active ? '0 0 4px currentColor' : 'none',
                   transition: 'background 0.3s',

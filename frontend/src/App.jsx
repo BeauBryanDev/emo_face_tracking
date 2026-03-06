@@ -2,18 +2,20 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './context/AuthContext'
 
 // Layouts
-import AuthLayout     from './layouts/AuthLayout'
+import AuthLayout from './layouts/AuthLayout'
 import DashboardLayout from './layouts/DashboardLayout'
 
 // Pages
-import Login    from './pages/Login'
+import Login from './pages/Login'
 import Register from './pages/Register'
 import Dashboard from './pages/Dashboard'
-import Emotions  from './pages/Emotions'
-import Profile   from './pages/Profile'
-import History   from './pages/History'
+import Home from './pages/Home'
+import Emotions from './pages/Emotions'
+import Profile from './pages/Profile'
+import History from './pages/History'
 import Inference from './pages/Inference'
 import Analytics from './pages/Analytics'
+
 
 // PROTECTED ROUTE
 // Redirects to /login if user is not authenticated.
@@ -34,7 +36,7 @@ const PublicRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth()
 
   if (loading) return <CyberpunkLoader />
-  if (isAuthenticated) return <Navigate to="/dashboard" replace />
+  if (isAuthenticated) return <Navigate to="/about" replace />
   return children
 }
 
@@ -117,15 +119,16 @@ const App = () => (
     >
       <Route path="/dashboard" element={<Dashboard />} />
       <Route path="/inference" element={<Inference />} />
-      <Route path="/history"   element={<History />} />
-      <Route path="/emotions"  element={<Emotions />} />
+      <Route path="/history" element={<History />} />
+      <Route path="/emotions" element={<Emotions />} />
       <Route path="/analytics" element={<Analytics />} />
-      <Route path="/profile"   element={<Profile />} />
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/about" element={<Home />} />
     </Route>
 
     {/* Default redirect */}
-    <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-    <Route path="*"  element={<Navigate to="/dashboard" replace />} />
+    <Route path="/" element={<Navigate to="/about" replace />} />
+    <Route path="*" element={<Navigate to="/about" replace />} />
   </Routes>
 )
 

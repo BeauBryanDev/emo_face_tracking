@@ -1,6 +1,8 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { getPcaVisualization, getSessionEmbeddingHistory, storeSessionEmbedding, clearSessionEmbeddings } from '../api/analytics'
 import Text from '../components/ui/Text'
+import PcaScatterPlot from '../components/PcaScatterPlot'
+import SessionEmbeddingManager from '../components/SessionEmbeddingManager'
 
 const Analytics = () => {
   const [payload, setPayload] = useState(null)
@@ -8,227 +10,229 @@ const Analytics = () => {
   const [error, setError] = useState(null)
   const [pcaHint, setPcaHint] = useState(null)
   const [sessionHistory, setSessionHistory] = useState([])
-  const [embeddingInput, setEmbeddingInput] = useState('')
-  const [sessionId, setSessionId] = useState('')
 
-  const formatTs = (iso) => {
-    if (!iso) return ''
-    const d = new Date(iso)
-    return d.toISOString().replace('T', ' ').substring(0, 19)
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      setPcaHint(null)
+      const data = await getPcaVisualization()
+      const history = await getSessionEmbeddingHistory(50)
+      setPayload(data)
+      setSessionHistory(history?.records || [])
+    } catch (e) {
+      const status = e?.response?.status
+      const detail = e?.response?.data?.detail
+      if (status === 422 && typeof detail === 'string' && detail.toLowerCase().includes('insufficient')) {
+        setPcaHint(detail)
+      } else {
+        setError('CRITICAL: FAILED_TO_SYNC_LATENT_SPACE')
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    const run = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        setPcaHint(null)
-        const data = await getPcaVisualization()
-        const history = await getSessionEmbeddingHistory(50)
-        setPayload(data)
-        setSessionHistory(history?.records || [])
-      } catch (e) {
-        const status = e?.response?.status
-        const detail = e?.response?.data?.detail
-        if (status === 422 && typeof detail === 'string' && detail.toLowerCase().includes('insufficient')) {
-          setPcaHint(detail)
-        } else {
-          setError('FAILED TO LOAD PCA DATA')
-        }
-      } finally {
-        setLoading(false)
-      }
-    }
-    run()
+    fetchData()
   }, [])
 
-  const points = payload?.points || []
-  const bounds = useMemo(() => {
-    if (!points.length) return { minX: 0, maxX: 1, minY: 0, maxY: 1 }
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
-    for (const p of points) {
-      minX = Math.min(minX, p.x)
-      maxX = Math.max(maxX, p.x)
-      minY = Math.min(minY, p.y)
-      maxY = Math.max(maxY, p.y)
+  const handleStoreEmbedding = async (embedding, sessionId) => {
+    try {
+      await storeSessionEmbedding(embedding, sessionId)
+      const history = await getSessionEmbeddingHistory(50)
+      setSessionHistory(history?.records || [])
+      // Refresh PCA if success
+      const updatedPca = await getPcaVisualization()
+      setPayload(updatedPca)
+    } catch (e) {
+      alert('STORAGE_PROTOCOL_FAILED: CHECK_CONSOLE_LOGS')
     }
-    return { minX, maxX, minY, maxY }
-  }, [points])
+  }
 
-  const mapPoint = (p, width, height, pad = 12) => {
-    const xRange = bounds.maxX - bounds.minX || 1
-    const yRange = bounds.maxY - bounds.minY || 1
-    const x = pad + ((p.x - bounds.minX) / xRange) * (width - pad * 2)
-    const y = pad + ((p.y - bounds.minY) / yRange) * (height - pad * 2)
-    return { x, y }
+  const handleClearSessions = async () => {
+    if (!window.confirm('PURGE_ALL_VECTORS: ARE_YOU_SURE?')) return
+    try {
+      await clearSessionEmbeddings()
+      setSessionHistory([])
+      setPayload(prev => ({ ...prev, points: [] }))
+    } catch (e) {
+      alert('CLEAR_OPERATIONS_ABORTED: SYSTEM_LOCK_ENGAGED')
+    }
   }
 
   if (loading) {
     return (
-      <div className="p-6">
-        <Text variant="mono" className="animate-pulse text-purple-400">
-          LOADING PCA PAYLOAD...
-        </Text>
+      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-neon-purple border-t-transparent rounded-full animate-spin shadow-neon-sm" />
+          <Text variant="mono" className="animate-pulse text-purple-400 tracking-[0.3em]">
+            SYNCHRONIZING_LATENT_SPACE...
+          </Text>
+        </div>
       </div>
     )
   }
 
-  if (error) {
+  if (error && !pcaHint) {
     return (
-      <div className="p-6">
-        <Text variant="mono" className="text-red-500">{error}</Text>
+      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
+        <div className="bg-purple-900/20 border border-red-500/50 p-8 flex flex-col items-center gap-4">
+          <div className="text-red-500 text-4xl">⚠</div>
+          <Text variant="mono" className="text-red-500 font-bold">{error}</Text>
+          <button
+            onClick={fetchData}
+            className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500 text-red-500 font-mono text-xs hover:bg-red-500 hover:text-white transition-all shadow-neon-sm"
+          >
+            RETRY_SYNC_SEQUENCE
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6">
-      <div className="border-b border-purple-800 pb-4">
-        <Text variant="h2">PCA ANALYTICS</Text>
-        <Text variant="mono">
-          POINTS: {payload?.total_points || 0} | VARIANCE: {payload?.total_variance || 0}
-        </Text>
-      </div>
+    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6 relative overflow-hidden">
 
-      {pcaHint && (
-        <div className="bg-surface-1 border border-purple-800 p-4">
-          <Text variant="mono" className="text-purple-300">
-            {pcaHint}
+      {/* BACKGROUND ACCENTS */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-neon-purple/50 to-transparent animate-scan-fast pointer-events-none" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-neon-purple/5 rounded-full blur-[150px] pointer-events-none" />
+
+      {/* DASHBOARD TOP BAR */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-purple-800/40 pb-6 gap-4 relative">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 bg-neon-purple shadow-neon-sm" />
+            <Text variant="h2" className="tracking-tighter text-3xl uppercase font-black">LATENT_SPACE_VISUALIZER</Text>
+          </div>
+          <Text variant="mono" className="text-purple-500 text-[10px] tracking-[0.2em] ml-4 font-bold">
+            PCA_ENGINE: ARCFACE_512D_REDUCTION // VARIANCE: {(payload?.total_variance || 0).toFixed(4)}
           </Text>
-          <Text variant="mono" className="text-purple-500">
-            Tip: Enroll biometrics for at least 3 users or store 3+ session embeddings.
-          </Text>
         </div>
-      )}
 
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-2">2D PROJECTION (X/Y)</Text>
-        <div className="w-full h-80 border border-purple-900 bg-surface-2">
-          <svg width="100%" height="100%" viewBox="0 0 600 300" preserveAspectRatio="none">
-            {points.map((p, idx) => {
-              const pos = mapPoint(p, 600, 300)
-              const color = p.is_current_user ? '#00ff88' : (p.source === 'registered' ? '#bf00ff' : '#cc44ff')
-              return (
-                <circle key={idx} cx={pos.x} cy={pos.y} r="2" fill={color} />
-              )
-            })}
-            {!points.length && (
-              <text x="50%" y="50%" textAnchor="middle" fill="#7c3aed" fontSize="12">
-                NO PCA POINTS AVAILABLE
-              </text>
-            )}
-          </svg>
-        </div>
-      </div>
-
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-2">SESSION EMBEDDINGS</Text>
-        <div className="flex flex-col gap-3">
-          <textarea
-            className="cyber-input h-28"
-            placeholder="Paste 512D embedding as JSON array"
-            value={embeddingInput}
-            onChange={(e) => setEmbeddingInput(e.target.value)}
-          />
-          <input
-            className="cyber-input"
-            placeholder="session_id (optional)"
-            value={sessionId}
-            onChange={(e) => setSessionId(e.target.value)}
-          />
-          <div className="flex gap-2">
-            <button
-              className="cyber-btn"
-              onClick={async () => {
-                if (!embeddingInput.trim()) return
-                try {
-                  const parsed = JSON.parse(embeddingInput)
-                  if (!Array.isArray(parsed) || parsed.length !== 512) {
-                    setError('EMBEDDING MUST BE 512 FLOATS')
-                    return
-                  }
-                  await storeSessionEmbedding(parsed, sessionId || null)
-                  const history = await getSessionEmbeddingHistory(50)
-                  setSessionHistory(history?.records || [])
-                } catch {
-                  setError('INVALID EMBEDDING JSON')
-                }
-              }}
-            >
-              STORE EMBEDDING
-            </button>
-            <button
-              className="cyber-btn"
-              onClick={async () => {
-                await clearSessionEmbeddings()
-                setSessionHistory([])
-              }}
-            >
-              CLEAR SESSIONS
-            </button>
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Global Nodes</span>
+            <span className="text-2xl font-display text-neon-purple glow-sm">{payload?.total_points || 0}</span>
+          </div>
+          <div className="h-10 w-[1px] bg-purple-800/50" />
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Sync Priority</span>
+            <span className="text-2xl font-display text-neon-purple glow-sm">STABLE</span>
           </div>
         </div>
       </div>
 
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-2">POINT METADATA (FIRST 20)</Text>
-        {points.length === 0 ? (
-          <Text variant="mono" className="text-purple-600">NO POINTS AVAILABLE</Text>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-purple-900/40 font-mono text-[10px] text-purple-300 tracking-wider uppercase border-b border-purple-700">
-                  <th className="p-3">USER</th>
-                  <th className="p-3">SOURCE</th>
-                  <th className="p-3">X</th>
-                  <th className="p-3">Y</th>
-                  <th className="p-3">Z</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-sm text-purple-100">
-                {points.slice(0, 20).map((p, idx) => (
-                  <tr key={idx} className="border-b border-purple-900/40">
-                    <td className="p-3">{p.user_id}</td>
-                    <td className="p-3">{p.source}</td>
-                    <td className="p-3">{p.x}</td>
-                    <td className="p-3">{p.y}</td>
-                    <td className="p-3">{p.z}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* MAIN CONTENT GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+
+        {/* LEFT PANEL: SCATTERPLOT VISUALIZATION (8/12) */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative flex-1 min-h-[500px]">
+            {/* MODULE FRAME */}
+            <div className="absolute -top-[1px] -right-[1px] w-8 h-8 border-t border-r border-neon-purple z-10" />
+            <div className="absolute bottom-4 right-4 z-20">
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-[#00ff88]" />
+                  <span className="text-[8px] text-purple-400 font-mono">SELF</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-[#bf00ff]" />
+                  <span className="text-[8px] text-purple-400 font-mono">ENROLLED</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 bg-[#cc44ff]" />
+                  <span className="text-[8px] text-purple-400 font-mono">SESSION</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 h-full flex flex-col">
+              <div className="flex items-center justify-between mb-4">
+                <Text variant="subtext" className="text-[10px] text-purple-400 font-bold uppercase tracking-widest">01 // TOPOLOGICAL_EMBEDDING_MAP</Text>
+                <div className="flex gap-1">
+                  <div className="w-8 h-[2px] bg-neon-purple/20" />
+                  <div className="w-1 h-[2px] bg-neon-purple" />
+                </div>
+              </div>
+
+              {pcaHint ? (
+                <div className="flex-1 flex items-center justify-center border border-purple-900 bg-purple-950/20 m-4 shadow-inner">
+                  <div className="max-w-md p-8 bg-surface-2 border border-purple-800 text-center flex flex-col gap-4 relative">
+                    <div className="absolute inset-0 border border-neon-purple/20 animate-pulse pointer-events-none" />
+                    <div className="text-neon-purple font-mono text-sm leading-relaxed tracking-tight group">
+                      {pcaHint}
+                    </div>
+                    <div className="h-[1px] bg-purple-800/50 w-full" />
+                    <Text variant="mono" className="text-purple-500 text-[10px] uppercase">
+                      Protocol: Enroll 3+ biometric profiles or store session vectors to generate map.
+                    </Text>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1">
+                  <PcaScatterPlot points={payload?.points || []} />
+                </div>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* TELEMETRY READOUT (BOTTOM STRIP) */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-3 flex justify-between items-center overflow-hidden">
+            <div className="flex gap-6 overflow-hidden">
+              <div className="flex flex-col min-w-[120px]">
+                <span className="text-[7px] text-purple-600 font-mono uppercase">DATA_SOURCE</span>
+                <span className="text-[10px] text-purple-200 font-mono font-black">NEURALCORE_PRIMARY</span>
+              </div>
+              <div className="flex flex-col min-w-[120px]">
+                <span className="text-[7px] text-purple-600 font-mono uppercase">LATENCY_SYNC</span>
+                <span className="text-[10px] text-purple-200 font-mono font-black">2.4ms_ENCRYPTED</span>
+              </div>
+              <div className="flex flex-col min-w-[120px]">
+                <span className="text-[7px] text-purple-600 font-mono uppercase">PCA_ALGO</span>
+                <span className="text-[10px] text-purple-200 font-mono font-black">RECURSIVE_SVD</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-neon-purple shadow-neon-sm animate-pulse" />
+              <span className="text-[8px] font-mono text-neon-purple font-black tracking-widest">LIVE_STREAM_ACTIVE</span>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT PANEL: SESSION MANAGEMENT (4/12) */}
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative flex-1 flex flex-col">
+            <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-neon-purple z-10" />
+            <div className="p-4 flex-1 flex flex-col">
+              <SessionEmbeddingManager
+                history={sessionHistory}
+                onStore={handleStoreEmbedding}
+                onClear={handleClearSessions}
+                error={error}
+              />
+            </div>
+          </div>
+        </div>
+
       </div>
 
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-2">SESSION HISTORY (LAST 50)</Text>
-        {sessionHistory.length === 0 ? (
-          <Text variant="mono" className="text-purple-600">NO SESSION DATA</Text>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-purple-900/40 font-mono text-[10px] text-purple-300 tracking-wider uppercase border-b border-purple-700">
-                  <th className="p-3">ID</th>
-                  <th className="p-3">SESSION</th>
-                  <th className="p-3">CAPTURED</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-sm text-purple-100">
-                {sessionHistory.map((r) => (
-                  <tr key={r.id} className="border-b border-purple-900/40">
-                    <td className="p-3">{r.id}</td>
-                    <td className="p-3">{r.session_id || 'N/A'}</td>
-                    <td className="p-3">{formatTs(r.captured_at)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* SYSTEM STATUS FOOTER */}
+      <div className="mt-4 flex items-center justify-between text-[8px] font-mono text-purple-600 tracking-[0.3em] border-t border-purple-800/20 pt-4 uppercase">
+        <div className="flex gap-8">
+          <span>COORDS: [34.0522, -118.2437]</span>
+          <span>IDENT_PROTO: ARC_V2</span>
+          <span>BUFFER: CACHE_SECURE</span>
+        </div>
+        <div className="flex gap-4 items-center">
+          <span className="animate-pulse">S Y S T E M _ O N L I N E</span>
+          <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-1 h-3 bg-neon-purple ${i % 2 === 0 ? 'opacity-20' : 'opacity-100'}`} />)}
           </div>
-        )}
+        </div>
       </div>
+
     </div>
   )
 }

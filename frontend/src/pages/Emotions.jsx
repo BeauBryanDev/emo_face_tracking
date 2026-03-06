@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { getEmotionSummary, getEmotionScores, getEmotionHistory, getEmotionDetails, getEmotionScoresChart } from '../api/emotions'
 import Text from '../components/ui/Text'
 import EmotionRadar from '../components/EmotionRadar'
+import EmotionDistributionPie from '../components/EmotionDistributionPie'
+import SentimentDoughnut from '../components/SentimentDoughnut'
+import EmotionHistoryHistogram from '../components/EmotionHistoryHistogram'
 
 const Emotions = () => {
   const [summary, setSummary] = useState(null)
@@ -47,143 +50,194 @@ const Emotions = () => {
 
   if (loading) {
     return (
-      <div className="p-6">
-        <Text variant="mono" className="animate-pulse text-purple-400">
-          LOADING EMOTIONS...
-        </Text>
+      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-neon-purple border-t-transparent rounded-full animate-spin shadow-neon-sm" />
+          <Text variant="mono" className="animate-pulse text-purple-400 tracking-[0.3em]">
+            INITIALIZING_NEURAL_MONITOR...
+          </Text>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="p-6">
-        <Text variant="mono" className="text-red-500">{error}</Text>
+      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
+        <div className="bg-purple-900/20 border border-red-500/50 p-8 flex flex-col items-center gap-4">
+          <div className="text-red-500 text-4xl">⚠</div>
+          <Text variant="mono" className="text-red-500 font-bold">{error}</Text>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500 text-red-500 font-mono text-xs hover:bg-red-500 hover:text-white transition-all"
+          >
+            RETRY_SYSTEM_LINK
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6">
-      <div className="flex items-end justify-between border-b border-purple-800 pb-4">
-        <div>
-          <Text variant="h2">EMOTION LOG</Text>
-          <Text variant="mono">SUMMARY + RECENT DETECTIONS</Text>
+    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6 relative overflow-hidden">
+
+      {/* HEADER DECOR */}
+      <div className="absolute top-0 right-0 w-64 h-64 bg-neon-purple/5 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-64 h-64 bg-neon-violet/5 blur-[120px] pointer-events-none" />
+
+      {/* DASHBOARD TOP BAR */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-purple-800/50 pb-6 gap-4 relative">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 bg-neon-purple shadow-neon-sm" />
+            <Text variant="h2" className="tracking-tighter text-3xl">NEURAL_EMOTION_HUD</Text>
+          </div>
+          <Text variant="mono" className="text-purple-500 text-[10px] tracking-[0.2em] ml-4">SYSTEM_STATUS: ACTIVE // DATA_FLOW: STABLE</Text>
         </div>
-        <div className="font-mono text-xs text-purple-400">
-          TOTAL: {summary?.total_detections || 0}
+
+        <div className="flex items-center gap-6">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Aggregate Detections</span>
+            <span className="text-2xl font-display text-neon-purple glow-sm">{summary?.total_detections || 0}</span>
+          </div>
+          <div className="h-10 w-[1px] bg-purple-800/50" />
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Dominant State</span>
+            <span className="text-2xl font-display text-neon-purple glow-sm">{(summary?.dominant_emotion || 'N/A').toUpperCase()}</span>
+          </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-surface-1 border border-purple-800 p-4">
-          <Text variant="subtext" className="mb-2">DOMINANT EMOTION</Text>
-          <Text variant="h1" glow className="text-neon-purple text-4xl">
-            {summary?.dominant_emotion || 'N/A'}
-          </Text>
-          <div className="mt-4 space-y-2">
-            {(summary?.emotion_stats || []).map((stat) => (
-              <div key={stat.emotion} className="flex items-center gap-3">
-                <div className="w-24 font-mono text-xs text-purple-300">
-                  {stat.emotion.toUpperCase()}
-                </div>
-                <div className="flex-1 h-1.5 bg-surface-3 border border-purple-900">
-                  <div
-                    className="h-full bg-neon-purple"
-                    style={{ width: `${stat.percentage}%` }}
-                  />
-                </div>
-                <div className="w-14 text-right font-mono text-xs text-purple-400">
-                  {stat.percentage.toFixed(1)}%
+      {/* MAIN COMMAND GRID */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+
+        {/* COLUMN 1: RADAR & SENTIMENT */}
+        <div className="flex flex-col gap-6">
+          {/* RADAR CORE */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative group">
+            <div className="absolute -top-[1px] -left-[1px] w-6 h-6 border-t border-l border-neon-purple z-10" />
+            <div className="p-4 flex flex-col h-[400px]">
+              <div className="flex items-center justify-between mb-4">
+                <Text variant="subtext" className="text-[10px] text-purple-400">01 // NEURAL_RADAR</Text>
+                <div className="flex gap-1">
+                  {[1, 2, 3].map(i => <div key={i} className="w-1 h-1 bg-neon-purple animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />)}
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-surface-1 border border-purple-800 p-4">
-          <Text variant="subtext" className="mb-2">RADAR DISTRIBUTION</Text>
-          <div className="h-72">
-            <EmotionRadar emotionScores={scores} />
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <div className="flex items-center justify-between mb-3">
-          <Text variant="subtext">DETAILS</Text>
-          <select
-            value={selectedEmotion}
-            onChange={(e) => setSelectedEmotion(e.target.value)}
-            className="bg-surface-2 border border-purple-700 text-purple-200 font-mono text-xs px-2 py-1"
-          >
-            {['Anger','Contempt','Disgust','Fear','Happiness','Neutral','Sadness','Surprise'].map((emo) => (
-              <option key={emo} value={emo}>{emo.toUpperCase()}</option>
-            ))}
-          </select>
-        </div>
-        {details?.emotion_stats?.length ? (
-          <div className="grid grid-cols-2 gap-3">
-            {details.emotion_stats.map((d) => (
-              <div key={d.class} className="data-readout">
-                <div className="font-mono text-[10px] text-purple-500">{d.class.toUpperCase()}</div>
-                <div className="font-mono text-sm text-purple-200">{(d.confidence * 100).toFixed(1)}%</div>
+              <div className="flex-1">
+                <EmotionRadar emotionScores={scores} />
               </div>
-            ))}
+            </div>
           </div>
-        ) : (
-          <Text variant="mono" className="text-purple-600">NO DETAIL DATA</Text>
-        )}
-      </div>
 
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-2">SCORES CHART</Text>
-        {chart?.emotion_stats?.length ? (
-          <div className="space-y-2">
-            {chart.emotion_stats.map((c) => (
-              <div key={c.class} className="flex items-center gap-3">
-                <div className="w-24 font-mono text-xs text-purple-300">{c.class.toUpperCase()}</div>
-                <div className="flex-1 h-1.5 bg-surface-3 border border-purple-900">
-                  <div className="h-full bg-neon-purple" style={{ width: `${c.percentage}%` }} />
+          {/* SENTIMENT DOUGHNUT */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative">
+            <div className="p-4 flex flex-col h-[220px]">
+              <Text variant="subtext" className="text-[10px] text-purple-400 mb-2">02 // SENTIMENT_INDEX</Text>
+              <div className="flex-1">
+                <SentimentDoughnut stats={summary?.emotion_stats} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMN 2: DISTRIBUTION & HISTOGRAM */}
+        <div className="flex flex-col gap-6">
+          {/* PIE DISTRIBUTION */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative">
+            <div className="p-4 flex flex-col h-[300px]">
+              <Text variant="subtext" className="text-[10px] text-purple-400 mb-2">03 // CLASS_DISTRIBUTION</Text>
+              <div className="flex-1">
+                <EmotionDistributionPie data={summary?.emotion_stats} />
+              </div>
+            </div>
+          </div>
+
+          {/* HISTOGRAM */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative">
+            <div className="p-4 flex flex-col h-[320px]">
+              <div className="flex items-center justify-between mb-4">
+                <Text variant="subtext" className="text-[10px] text-purple-400">04 // INTENSITY_HISTOGRAM</Text>
+                <select
+                  value={selectedEmotion}
+                  onChange={(e) => setSelectedEmotion(e.target.value)}
+                  className="bg-purple-950 border border-purple-700 text-purple-400 font-mono text-[9px] px-2 py-0.5 outline-none focus:border-neon-purple uppercase"
+                >
+                  {['Anger', 'Contempt', 'Disgust', 'Fear', 'Happiness', 'Neutral', 'Sadness', 'Surprise'].map((emo) => (
+                    <option key={emo} value={emo}>{emo}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1">
+                <EmotionHistoryHistogram data={details?.emotion_stats} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* COLUMN 3: RECENT LOG & READOUTS */}
+        <div className="flex flex-col gap-6">
+          {/* STATS BARS */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-2">
+              <div className="w-16 h-[1px] bg-neon-purple/20 rotate-45 transform translate-x-4 -translate-y-4" />
+            </div>
+            <Text variant="subtext" className="text-[10px] text-purple-400 mb-4 uppercase">05 // TELEMETRY_FEED</Text>
+            <div className="space-y-4">
+              {(summary?.emotion_stats || []).map((stat) => (
+                <div key={stat.emotion} className="group cursor-help">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-mono text-[9px] text-purple-300 group-hover:text-neon-purple transition-colors uppercase">{stat.emotion}</span>
+                    <span className="font-mono text-[9px] text-purple-500">{stat.percentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-1 bg-purple-900 overflow-hidden relative">
+                    <div
+                      className="h-full bg-neon-purple shadow-neon-sm transition-all duration-1000"
+                      style={{ width: `${stat.percentage}%` }}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent w-full h-full -translate-x-full group-hover:animate-scan-fast" />
+                  </div>
                 </div>
-                <div className="w-14 text-right font-mono text-xs text-purple-400">{c.percentage.toFixed(1)}%</div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        ) : (
-          <Text variant="mono" className="text-purple-600">NO CHART DATA</Text>
-        )}
-      </div>
 
-      <div className="bg-surface-1 border border-purple-800 p-4">
-        <Text variant="subtext" className="mb-3">RECENT DETECTIONS</Text>
-        {recent.length === 0 ? (
-          <Text variant="mono" className="text-purple-600">NO RECENT DATA</Text>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-purple-900/40 font-mono text-[10px] text-purple-300 tracking-wider uppercase border-b border-purple-700">
-                  <th className="p-3">ID</th>
-                  <th className="p-3">TIMESTAMP</th>
-                  <th className="p-3">EMOTION</th>
-                  <th className="p-3">CONFIDENCE</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono text-sm text-purple-100">
+          {/* RECENT DETECTIONS TABLE */}
+          <div className="bg-surface-1/40 border border-purple-800/40 p-4 relative flex-1 overflow-hidden flex flex-col">
+            <Text variant="subtext" className="text-[10px] text-purple-400 mb-4 uppercase">06 // EVENT_LOG</Text>
+            <div className="flex-1 overflow-y-auto scrollbar-cyber pr-2">
+              <div className="space-y-2">
                 {recent.map((r) => (
-                  <tr key={r.id} className="border-b border-purple-900/40">
-                    <td className="p-3 text-purple-500">{String(r.id)}</td>
-                    <td className="p-3">{formatTs(r.timestamp)}</td>
-                    <td className="p-3">{r.dominant_emotion}</td>
-                    <td className="p-3">{(r.confidence * 100).toFixed(1)}%</td>
-                  </tr>
+                  <div key={r.id} className="flex flex-col gap-1 p-2 bg-purple-950/40 border-l border-purple-800 hover:border-neon-purple transition-all group">
+                    <div className="flex justify-between items-center px-1">
+                      <span className="font-mono text-[8px] text-purple-600">ID: {String(r.id).padStart(4, '0')}</span>
+                      <span className="font-mono text-[8px] text-purple-600">{formatTs(r.timestamp)}</span>
+                    </div>
+                    <div className="flex justify-between items-center px-2">
+                      <span className="font-mono text-[11px] text-purple-200 uppercase group-hover:text-neon-purple transition-colors">{r.dominant_emotion}</span>
+                      <span className="font-mono text-[11px] text-neon-purple font-black">{(r.confidence * 100).toFixed(0)}%</span>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
+              </div>
+            </div>
           </div>
-        )}
+        </div>
+
       </div>
+
+      {/* FOOTER SYSTEM METRICS */}
+      <div className="mt-4 flex items-center justify-between text-[8px] font-mono text-purple-600 tracking-widest border-t border-purple-800/30 pt-4">
+        <div className="flex gap-4">
+          <span>COORDS: [34.0522, -118.2437]</span>
+          <span>UI_VER: 4.2.0-STABLE</span>
+          <span>NEURAL_ENGINE: V3-PRO</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 rounded-full bg-neon-purple shadow-neon-sm animate-pulse" />
+          <span>DATALINK: SECURE_ENCRYPTED</span>
+        </div>
+      </div>
+
     </div>
   )
 }

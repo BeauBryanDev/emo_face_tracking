@@ -5,7 +5,7 @@ import sys
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 from app.core.config import settings
 
 # --- Logging Configuration ---
@@ -19,27 +19,6 @@ ENVIRONMENT  = os.getenv("ENVIRONMENT", "development")
 LOG_MAX_BYTES =  10 * 1024 * 1024  # 10 MB
 LOG_BACKUPS   =   5
 LOG_BACKUP_COUNT =  5
-
-# Create log directory if it doesn't exist
-if not LOG_DIR.exists():
-    LOG_DIR.mkdir(parents=True)
-
-# Create log file if it doesn't exist
-if not LOG_FILE.exists():
-    LOG_FILE.touch()
-
-# Set log file size limit
-handler = logging.handlers.RotatingFileHandler(
-    LOG_FILE,
-    maxBytes=LOG_MAX_BYTES,
-    backupCount=LOG_BACKUPS
-)
-
-# Set log file format
-formatter = logging.Formatter(
-    fmt="%(asctime)s [%(levelname)s] %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S"
-)
 
 class DevFormatter(logging.Formatter):
     
@@ -135,7 +114,11 @@ def setup_logging() -> None:
 
     """
     
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+    except PermissionError:
+        # CI and some local envs cannot write to /app; fallback to stdout-only logging.
+        pass
 
     # Elegir formatter segun entorno
     if ENVIRONMENT == "production":

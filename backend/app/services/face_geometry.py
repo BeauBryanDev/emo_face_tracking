@@ -349,11 +349,11 @@ def _classify_head_pose(yaw: float, pitch: float, roll: float) -> str:
     # Horizontal orientation check
     if yaw < -YAW_THRESHOLD:
         
-        return "looking_left"
+        return "looking_right"
     
     if yaw > YAW_THRESHOLD:
         
-        return "looking_right"
+        return "looking_left"
     
     # Vertical orientation check
     if pitch > PITCH_THRESHOLD:
