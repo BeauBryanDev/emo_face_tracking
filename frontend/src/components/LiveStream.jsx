@@ -5,6 +5,9 @@ import EmotionRadar from './EmotionRadar';
 
 import { useState } from 'react'
 import { saveEmotion } from '../api/emotions'
+import { INFERENCE_FRAME } from '../config/inference'
+
+
 
 const LiveStream = () => {
   const { videoRef, results, isConnected, error, startCamera, stopCamera } = useFaceTracking();
@@ -27,18 +30,23 @@ const LiveStream = () => {
   const eyeState = hasFace ? results.geometry?.ear?.eye_state : null;
   const isDrowsy = hasFace ? results.geometry?.ear?.is_drowsy : false;
   const headPose = hasFace ? results.geometry?.head_pose?.pose_label : null;
+ 
+  const FRAME_WIDTH = INFERENCE_FRAME.width
+  const FRAME_HEIGHT = INFERENCE_FRAME.height
+
 
   // Bounding box Tensor X3D  Transform
     const getBBoxStyles = () => {
     if (!bbox) return { display: 'none' };
     const [x1, y1, x2, y2] = bbox;
     return {
-      left: `${(x1 / 640) * 100}%`,
-      top: `${(y1 / 480) * 100}%`,
-      width: `${((x2 - x1) / 640) * 100}%`,
-      height: `${((y2 - y1) / 480) * 100}%`,
+      left: `${(x1 / FRAME_WIDTH) * 100}%`,
+      top: `${(y1 / FRAME_HEIGHT) * 100}%`,
+      width: `${((x2 - x1) / FRAME_WIDTH) * 100}%`,
+      height: `${((y2 - y1) / FRAME_HEIGHT) * 100}%`,
     };
   };
+
 
   const handleSaveEmotion = async () => {
   if (!hasFace || !liveness?.is_live || !results?.emotion) return

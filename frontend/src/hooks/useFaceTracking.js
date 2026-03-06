@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { getStreamUrl } from '../api/inference'
+import { INFERENCE_FRAME } from '../config/inference'
+
 
 export const useFaceTracking = () => {
   const { token } = useAuth()
@@ -18,6 +20,9 @@ export const useFaceTracking = () => {
   const waitingRef = useRef(false)
   const lastSentAtRef = useRef(0)
   const mountedRef = useRef(true)
+
+  const intervalRef = useRef(null)
+
 
   const safeSet = useCallback((setter, value) => {
     if (!mountedRef.current) return
@@ -51,7 +56,7 @@ export const useFaceTracking = () => {
       stopCamera()
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 640, height: 480, frameRate: { ideal: 15 } },
+        video: { width: 640, height: 480, frameRate: { ideal: 10, max: 15 } },
       })
 
       if (!mountedRef.current) {
@@ -153,11 +158,12 @@ export const useFaceTracking = () => {
   useEffect(() => {
     if (!isConnected || !videoReady) return
 
-    const intervalMs = 300
+    const intervalMs = INFERENCE_FRAME.intervalMs
+    let encoding = false
 
     const interval = setInterval(() => {
 
-      if (waitingRef.current) return
+      if (waitingRef.current || encoding) return
 
       const ws = wsRef.current
       const video = videoRef.current
@@ -172,8 +178,9 @@ export const useFaceTracking = () => {
       ) {
         const canvas = canvasRef.current
 
-        const TARGET_WIDTH = 320
-        const TARGET_HEIGHT = 240
+        const TARGET_WIDTH = INFERENCE_FRAME.width
+        const TARGET_HEIGHT = INFERENCE_FRAME.height
+
 
         canvas.width = TARGET_WIDTH
         canvas.height = TARGET_HEIGHT
@@ -184,13 +191,22 @@ export const useFaceTracking = () => {
 
         ctx.drawImage(video, 0, 0, TARGET_WIDTH, TARGET_HEIGHT)
 
-        waitingRef.current = true
+        encoding = true
 
-        ws.send(
-          JSON.stringify({
-            image: canvas.toDataURL('image/jpeg', 0.5)
-          })
-        )
+        canvas.toBlob((blob) => {
+
+          encoding = false
+
+          if (!blob) return
+
+          if (ws.readyState !== WebSocket.OPEN) return
+
+          waitingRef.current = true
+
+          ws.send(blob)
+
+        }, 'image/jpeg', INFERENCE_FRAME.jpegQuality)
+
       }
 
     }, intervalMs)
@@ -198,6 +214,7 @@ export const useFaceTracking = () => {
     return () => {
       clearInterval(interval)
       waitingRef.current = false
+      encoding = false
     }
 
   }, [isConnected, videoReady])

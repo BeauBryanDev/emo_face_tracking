@@ -44,6 +44,34 @@ def decode_base64_image(base64_string: str) -> Optional[np.ndarray]:
         logger.error("Failed to decode base64 image", exc_info=True)
         
         return None
+    
+    
+def decode_jpeg_bytes(image_bytes: bytes) -> Optional[np.ndarray]:
+    
+    """
+    Docstring for decode_jpeg_bytes
+    
+    :param image_bytes: Description
+    :type image_bytes: bytes
+    :return: Description
+    :rtype: Any | None
+    """     
+    
+    try:
+        np_arr = np.frombuffer(image_bytes, np.uint8)
+        
+        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        
+        return image
+    
+    except Exception as e:
+        
+        print(f"Error decoding JPEG bytes: {str(e)}")
+        
+        logger.error("Failed to decode jpeg bytes", exc_info=True)
+        
+        return None
+
 
 def convert_and_resize(
     image: np.ndarray, 

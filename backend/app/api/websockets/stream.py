@@ -9,7 +9,7 @@ from app.core.session import get_db
 from app.api.websockets.manager import manager
 from app.api.dependencies import get_user_from_token
 from app.services.inference_engine import inference_engine
-from app.utils.image_processing import decode_base64_image, align_face
+from app.utils.image_processing import decode_base64_image, decode_jpeg_bytes, align_face
 from app.services.face_math import verify_biometric_match
 #from app.models.emotions import Emotion 
 from app.services.face_geometry import analyze_face_geometry
@@ -40,18 +40,38 @@ async def websocket_endpoint(
     try:
         
         while True:
-            # Receivee frame from frontend
-            raw_data = await websocket.receive_text()
-            payload = json.loads(raw_data)
-            base64_string = payload.get("image")
+            # Receive frame from frontend.
+            # Supports both binary JPEG frames and legacy JSON/base64 payloads.
+            ws_message = await websocket.receive()
+            raw_bytes = ws_message.get("bytes")
+
+            if raw_bytes is not None:
+                
+                image = decode_jpeg_bytes(raw_bytes)
+                
+            else:
+                
+                raw_text = ws_message.get("text")
+                
+                if not raw_text:
+                                        
+                    continue
+                
+                payload = json.loads(raw_text)
+                
+                base64_string = payload.get("image")
+                
+                if not base64_string:
+                    
+                    continue
+                
+                image = decode_base64_image(base64_string)
             
-            if not base64_string:
+            if image is None:
+                
                 continue
 
             # Decodificar imagen
-            image = decode_base64_image(base64_string)
-            if image is None:
-                continue
 
             # ML Pipeline
             faces = inference_engine.detect_faces(image , threshold=0.3 ) 
