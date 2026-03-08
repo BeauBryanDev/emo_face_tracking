@@ -6,6 +6,7 @@ import cv2
 #import asynci0
 import time 
 from starlette.concurrency import run_in_threadpool
+from collections import deque
 
 from app.core.session import get_db
 from app.api.websockets.manager import manager
@@ -21,6 +22,7 @@ from app.core.logging import get_logger
 logger = get_logger(__name__)
 
 router = APIRouter()
+
 
 @router.websocket("/ws/stream")
 async def websocket_endpoint(
@@ -43,6 +45,10 @@ async def websocket_endpoint(
     consecutive_low_ear_frames = 0
     previous_gray = None
     MOTION_THRESHOLD = 2.0
+    
+    mar_buffer = deque(maxlen=6)
+    prev_mar = None
+
 
     try:
         
@@ -153,9 +159,16 @@ async def websocket_endpoint(
                 landmarks=np.array(landmarks),
                 image_width=img_w,
                 image_height=img_h,
-                consecutive_low_ear_frames=consecutive_low_ear_frames
+                consecutive_low_ear_frames=consecutive_low_ear_frames,
+                prev_mar=prev_mar,
+                mar_series=list(mar_buffer)
             )
             
+            # Update MAR temporal buffer
+            current_mar = geometry_data["mar"]["mar"]
+            mar_buffer.append(current_mar)
+            prev_mar = current_mar
+                        
             if geometry_data["ear"]["ear"] < 0.22:
                 
                 

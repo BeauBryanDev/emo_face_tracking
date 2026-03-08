@@ -76,7 +76,7 @@ def compute_ear_from_landmarks(landmarks: np.ndarray) -> float :
     # This distance is normalized by the inter-ocular distance.
     # When eyes close, this component decreases as landmarks shift downwards.
     vertical_component = float(np.linalg.norm(eye_center - nose))
-    print(f"Left eye: {left_eye}, Right eye: {right_eye}, Nose: {nose}")
+    logger.debug(f"Left eye: {left_eye}, Right eye: {right_eye}, Nose: {nose}")
     ear = (vertical_component / eye_distance)
     # Scale factor to align with standard EAR ranges
     ear_normalized = ear * 0.5
@@ -140,8 +140,6 @@ def classify_eye_state(
         eye_state = "open"
         
         
-    print(f"EAR: {ear:.4f}, Blinking: {is_blinking}, Drowsy: {is_drowsy}, State: {eye_state}")
-
     return {
         "ear"        : ear,
         "eye_state"  : eye_state,
@@ -187,7 +185,7 @@ def compute_mar_from_landmarks(landmarks: np.ndarray) -> float:
     vertical = float(np.linalg.norm(nose - mouth_center))
 
     mar = vertical / mouth_width
-    print(f"MAR calculation: vertical={vertical:.2f}, mouth_width={mouth_width:.2f}, mar={mar:.4f}")
+    logger.debug(f"MAR calculation: vertical={vertical:.2f}, mouth_width={mouth_width:.2f}, mar={mar:.4f}")
     
     return round(float(mar), 4)
 
@@ -292,8 +290,6 @@ def estimate_head_pose(
 
     pose_label = _classify_head_pose(yaw, pitch, roll)
     is_frontal = pose_label == "frontal"
-
-    print(f"Head pose estimation: pitch={pitch:.2f}, yaw={yaw:.2f}, roll={roll:.2f}, pose_label={pose_label}, is_frontal={is_frontal}")
     
     # check this articlo for more infor : 
     # https://www.learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
@@ -368,12 +364,133 @@ def _classify_head_pose(yaw: float, pitch: float, roll: float) -> str:
     return "frontal"
 
 
+def analyze_expression_state(
+    mar: float,
+    mouth_width: float,
+    interocular_distance: float,
+    yaw: float,
+    pitch: float,
+    ear: float ,
+    prev_mar: float | None = None,
+    mar_series: list[float] | None = None,
+    mar_threshold: float = 0.60
+) -> dict:
+    """
+    Infers high-level facial behavioral signals from geometric ratios
+    using geometric heuristics.
+
+    This function derives approximate behavioral states such as smiling,
+    speaking, and distraction using only SCRFD 5-point landmarks and
+    head pose estimation.
+
+    Signals detected:
+        - Smile proxy
+        - Talking activity (temporal MAR variation)
+        - Attention / distraction state
+        - Happy proxy (smile + attention)
+
+    Args:
+        mar (float): Mouth Aspect Ratio.
+        mouth_width (float): Horizontal mouth distance.
+        interocular_distance (float): Distance between eyes.
+        yaw (float): Head horizontal rotation.
+        pitch (float): Head vertical rotation.
+        prev_mar (float | None): MAR from previous frame.
+
+    Returns:
+        dict: Expression and attention analysis.
+    """
+
+    if interocular_distance < 1e-6:
+        return {
+            "expressions": {
+                "is_smiling": False,
+                "is_duchenne_smile": False,
+                "is_talking": False,
+                "is_happy": False,
+                "smile_score": 0.0,
+                "talk_score": 0.0,
+                "happy_score": 0.0
+            },
+            "attention": {
+                "is_distracted": False,
+                "attention_state": "unknown"
+            }
+        }
+
+    # Smile ratio (normalized mouth width)
+    smile_ratio = mouth_width / interocular_distance
+    smile_score = round(float(smile_ratio), 3)
+
+    # Smile heuristic
+    is_smiling = smile_ratio > 0.55 and mar < 0.45
+    
+    # --- Duchenne smile proxy (eye contraction) ---
+    # When smiling genuinely, eyes narrow slightly
+    # EAR tends to drop slightly compared to neutral range
+    duchenne_score = max(0.0, 0.35 - ear)
+    is_duchenne = is_smiling and ear < 0.30 and duchenne_score > 0.0
+
+    # Talking detection (temporal MAR variation)
+    talk_score = 0.0
+    is_talking = False
+    
+    if mar_series and len(mar_series) >= 4:
+        
+        mar_variance = float(np.var(mar_series))
+        talk_score = round(mar_variance * 10, 3)
+
+        if mar_variance > 0.0025:
+            
+            is_talking = True
+
+    elif prev_mar is not None:
+        
+        delta = abs(mar - prev_mar)
+        talk_score = round(delta, 3)
+        
+        if delta > 0.05:
+            is_talking = True
+            
+    # Attention / distraction
+    is_distracted = abs(yaw) > 20 or abs(pitch) > 20
+
+    # Happy proxy
+    happy_score = smile_score * (1.2 if is_duchenne else 0.8)
+    is_happy = is_smiling and not is_distracted
+    
+    # Engagement proxy (attention + happiness)
+    attention_factor = 0.0 if is_distracted else 1.0
+    engagement_score = round(attention_factor * happy_score, 3)
+
+
+    return {
+        "expressions": {
+            "is_smiling": is_smiling,
+            "is_duchenne_smile": is_duchenne,
+            "is_talking": is_talking,
+            "is_happy": is_happy,
+            "smile_score": smile_score,
+            "talk_score": talk_score,
+            "happy_score": round(happy_score, 3),
+            "engagement_score": engagement_score    
+        },
+        "attention": {
+            "is_distracted": is_distracted,
+            "attention_state": "distracted" if is_distracted else "focused"
+        }
+    }
+
+
+
 # Analyze Face Geometry
 def analyze_face_geometry(
     landmarks: np.ndarray,
     image_width: int,
     image_height: int,
-    consecutive_low_ear_frames: int = 0
+    consecutive_low_ear_frames: int = 0,
+    prev_mar: float | None = None,
+    mar_series: list[float] | None = None
 ) -> dict:
     """
     Executes  facial geometric analysis in a single call.
@@ -408,13 +525,35 @@ def analyze_face_geometry(
             "is_yawning"  : mar > 0.60, # Threshold for yawn detection
         }
         
+        # Additional geometric distances
+        left_eye  = landmarks[IDX_LEFT_EYE]
+        right_eye = landmarks[IDX_RIGHT_EYE]
+        mouth_l   = landmarks[IDX_MOUTH_LEFT]
+        mouth_r   = landmarks[IDX_MOUTH_RIGHT]
+
+        interocular_distance = float(np.linalg.norm(right_eye - left_eye))
+        mouth_width = float(np.linalg.norm(mouth_r - mouth_l))
+        
         # Estimate head orientation using PnP
         head_pose = estimate_head_pose(landmarks, image_width, image_height)
+        
+        expression_data = analyze_expression_state(
+            mar=mar_data["mar"],
+            mouth_width=mouth_width,
+            interocular_distance=interocular_distance,
+            yaw=head_pose["yaw"],
+            pitch=head_pose["pitch"],
+            ear=ear_data["ear"],
+            prev_mar=prev_mar,
+            mar_series=mar_series
+        )
+
 
         return {
             "ear"      : ear_data,
             "mar"      : mar_data,
             "head_pose": head_pose,
+            **expression_data
         }
 
     except Exception as e:
@@ -429,5 +568,46 @@ def analyze_face_geometry(
             "ear"      : {"ear": 0.0, "eye_state": "unknown", "is_blinking": False, "is_drowsy": False},
             "mar"      : {"mar": 0.0, "is_yawning": False},
             "head_pose": {"pitch": 0.0, "yaw": 0.0, "roll": 0.0, "pose_label": "unknown", "is_frontal": False},
+            **expression_data
             
         }
+
+
+"""
+    backend output to frotnend on websocker
+    
+    {
+        "ear": {
+        "ear": 0.31,
+        "eye_state": "open",
+        "is_blinking": false,
+        "is_drowsy": false
+        },
+
+        "mar": {
+        "mar": 0.41,
+        "is_yawning": false
+        },
+
+        "head_pose": {
+        "pitch": 3.1,
+        "yaw": -2.3,
+        "roll": 1.0,
+        "pose_label": "frontal",
+        "is_frontal": true
+        },
+
+        "expressions": {
+        "is_smiling": true,
+        "is_talking": false,
+        "is_happy": true
+        },
+
+        "attention": {
+        "is_distracted": false,
+        "attention_state": "focused"
+        }
+}
+
+
+"""
