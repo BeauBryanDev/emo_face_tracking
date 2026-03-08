@@ -64,6 +64,29 @@ const NAV_ITEMS = [
     ),
   },
   {
+    path: '/report',
+    label: 'EMOTION REPORT',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M4 4h16v16H4z" />
+        <path d="M8 16v-5" />
+        <path d="M12 16V8" />
+        <path d="M16 16v-2" />
+      </svg>
+    ),
+  },
+  {
+    path: '/russelquadrants',
+    label: 'EMOTION ANALYSIS',
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+        <path d="M12 2v20" />
+        <path d="M2 12h20" />
+        <circle cx="16" cy="8" r="2.5" />
+      </svg>
+    ),
+  },
+  {
     path: '/profile',
     label: 'OPERATOR PROFILE',
     icon: (

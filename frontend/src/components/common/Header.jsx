@@ -14,6 +14,8 @@ const PAGE_TITLES = {
   '/history':   { title: 'HISTORY',       sub: 'EMOTION ARCHIVES' },
   '/emotions':  { title: 'EMOTION LOG',   sub: 'DETECTION HISTORY & ANALYTICS' },
   '/analytics':{ title: 'ANALYTICS',     sub: 'PCA EMBEDDING SPACE' },
+  '/report':    { title: 'EMOTION REPORT', sub: 'OPERATIONAL EMOTION INTELLIGENCE' },
+  '/russelquadrants': { title: 'EMOTION ANALYSIS', sub: 'RUSSELL CIRCUMPLEX MODEL' },
   '/profile':   { title: 'OPERATOR',      sub: 'IDENTITY & BIOMETRIC PROFILE' },
 }
 

@@ -15,6 +15,8 @@ import Profile from './pages/Profile'
 import History from './pages/History'
 import Inference from './pages/Inference'
 import Analytics from './pages/Analytics'
+import EmotionReport from './pages/EmotionReport'
+import EmotionsAnalysis from './pages/EmotionsAnalysis'
 
 
 // PROTECTED ROUTE
@@ -122,6 +124,8 @@ const App = () => (
       <Route path="/history" element={<History />} />
       <Route path="/emotions" element={<Emotions />} />
       <Route path="/analytics" element={<Analytics />} />
+      <Route path="/report" element={<EmotionReport />} />
+      <Route path="/russelquadrants" element={<EmotionsAnalysis />} />
       <Route path="/profile" element={<Profile />} />
       <Route path="/about" element={<Home />} />
     </Route>
