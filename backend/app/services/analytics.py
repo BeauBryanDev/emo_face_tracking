@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.models.users import User
 from app.models.face_session import FaceSessionEmbedding
 from app.core.logging import get_logger
+from app.services.face_math import apply_pca_reduction
 
 
 logger = get_logger(__name__)
@@ -17,95 +18,57 @@ N_COMPONENTS = 3
 # Number of principal components to retain for the 3D scatter plot.
 N_COMPONENTS_RETAINED = 2
 
+
 def compute_pca(
     embeddings: np.ndarray,
     n_components: int = N_COMPONENTS
 ) -> dict:
-    
     """
-    Computes PCA on a batch of L2-normalized face embeddings using SVD.
-
-    Args:
-        embeddings:   2D array of shape (n_samples, 512). Each row is a
-                      L2-normalized ArcFace embedding vector.
-        n_components: Number of principal components to retain (default: 3).
-
-    Returns:
-        dict containing:
-            projected:          ndarray (n_samples, n_components) - reduced coords.
-            explained_variance: list of variance explained per component (0-1).
-            total_variance:     float - cumulative variance explained by all components.
-            mean_vector:        ndarray (512,) - mean used for centering (for inference).
-            principal_components: ndarray (n_components, 512) - top eigenvectors.
+    Wrapper around face_math.apply_pca_reduction that adapts the result
+    to the analytics payload format.
     """
-    
+
     n_samples, n_features = embeddings.shape
-    logger.debug(f"Computing PCA on {n_samples} samples with {n_features} features.")
-    
-    if n_samples < MIN_SAMPLES_REQUIRED:
-        
-        raise ValueError(
-            f"At least {MIN_SAMPLES_REQUIRED} samples are required for PCA. Got {n_samples}."
-        )
-        
-        
-    if   n_components > min(n_samples, n_features):
-        
-        n_components = min(n_samples, n_features)
-        
-        logger.warning(
-            f"n_components reduced to {n_components} "
-            f"(min of n_samples={n_samples}, n_features={n_features})."
-        )
-
-    # Mean centering - removes the DC component of the distribution.
-    # Center the data
-    mean_vector = np.mean(embeddings, axis=0)
-    centered_embeddings = embeddings - mean_vector
-    
     # Thin SVD decomposition
     # X = U * S * Vt
     # U:  (n_samples, n_samples)  - left singular vectors
     # S:  (min(n,p),)             - singular values (sqrt of eigenvalues)
     # Vt: (n_features, n_features) - right singular vectors (principal components)
-    
-    U, S, Vt = np.linalg.svd(centered_embeddings, full_matrices=False)
-    
     # Compute explained variance ratio.
     # Eigenvalues of the covariance matrix = S^2 / (n_samples - 1)
-    eigenvalues          = (S ** 2) / (n_samples - 1)
-    total_eigenvalue_sum = float(np.sum(eigenvalues))
-    
-    explained_variance = []
-    
-    for i in range(n_components):
-        
-        ratio = float(eigenvalues[i] / total_eigenvalue_sum) if total_eigenvalue_sum > 0 else 0.0
-        explained_variance.append(round(ratio, 4))
+    logger.debug(
+        f"Computing PCA on {n_samples} samples with {n_features} features."
+    )
 
-    total_variance = round(sum(explained_variance), 4)
-    
-    # Project data onto the top n_components principal components.
-    
-    principal_components = Vt[:n_components]
-    
-    # Projection: (n_samples, 512) @ (512, n_components) = (n_samples, n_components)
-    
-    projected = centered_embeddings @ principal_components.T
-    
+    if n_samples < MIN_SAMPLES_REQUIRED:
+        raise ValueError(
+            f"At least {MIN_SAMPLES_REQUIRED} samples are required for PCA. "
+            f"Got {n_samples}."
+        )
+
+    # Run PCA using math service
+    pca = apply_pca_reduction(embeddings, n_components)
+
+    projected = pca["reduced_embeddings"]
+
+    explained_variance_ratio = pca["explained_variance_ratio"]
+    cumulative_variance = pca["cumulative_variance"]
+
+    total_variance = float(cumulative_variance[-1]) if len(cumulative_variance) > 0 else 0.0
+
     logger.info(
         f"PCA computed. samples={n_samples} components={n_components} "
         f"variance_explained={total_variance:.4f}"
     )
 
     return {
-        "projected"           : projected,
-        "explained_variance"  : explained_variance,
-        "total_variance"      : total_variance,
-        "mean_vector"         : mean_vector,
-        "principal_components": principal_components,
+        "projected": projected,
+        "explained_variance": explained_variance_ratio.tolist(),
+        "cumulative_variance": cumulative_variance.tolist(),
+        "total_variance": round(total_variance, 4),
+        "mean_vector": pca["mean_vector"],
+        "principal_components": pca["principal_components"],
     }
-
 
 # DATABASE QUERY HELPERS
 
@@ -275,6 +238,8 @@ def build_pca_payload(
     
     pca_result = compute_pca(embedding_matrix, n_components=N_COMPONENTS)
     projected  = pca_result["projected"]
+    explained_variance = pca_result["explained_variance"]
+    cumulative_variance = pca_result["cumulative_variance"]
     
     # Build the response points list with metadata for frontend rendering
     points = []
@@ -306,14 +271,16 @@ def build_pca_payload(
         
     
     return {
-        "points"            : points,
-        "explained_variance": pca_result["explained_variance"],
-        "total_variance"    : pca_result["total_variance"],
-        "total_points"      : total_points,
-        "registered_count"  : len(registered),
-        "session_count"     : len(session_data),
-        "n_components"      : N_COMPONENTS,
-        "embedding_dims"    : 512,
-    }
+    "points": points,
+    "explained_variance": explained_variance,
+    "cumulative_variance": cumulative_variance,
+    "total_variance": pca_result["total_variance"],
+    "total_points": total_points,
+    "registered_count": len(registered),
+    "session_count": len(session_data),
+    "n_components": N_COMPONENTS,
+    "embedding_dims": 512,
     
+    }
+
     

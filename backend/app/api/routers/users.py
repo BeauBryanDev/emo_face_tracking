@@ -10,7 +10,7 @@ from app.models.users import User
 from app.schemas.user_schema import UserResponse , UserUpdate , UserCreate
 from app.services.inference_engine import inference_engine
 from app.utils.image_processing import align_face, prepare_tensor_for_onnx
-from app.services.face_math import compute_cosine_similarity, verify_biometric_match, apply_pca_reduction
+from app.services.face_math import compute_cosine_similarity, verify_biometric_match
 
 
 router = APIRouter()
