@@ -5,6 +5,8 @@ import PCAVarianceSpectrum from "../components/pca/PCAVarianceSpectrum"
 import PCAInteligencePanel from "../components/pca/PCAInteligencePanel"
 import PCALegend from "../components/pca/PCALegend"
 
+
+
 export default function PCAAnalytics() {
 
   const { data, loading, error } = usePCAData()

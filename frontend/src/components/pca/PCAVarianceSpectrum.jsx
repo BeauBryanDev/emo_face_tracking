@@ -9,23 +9,24 @@ import {
 
 export default function PCAVarianceSpectrum({ data }) {
 
-  const variance = data?.variance || []
+  if (!data?.explained_variance) return null
 
-  const chartData = variance.map((v,i)=>({
-    component: `PC${i+1}`,
-    variance: v
+  const chartData = data.explained_variance.map((v,i)=>({
+    pc:`PC${i+1}`,
+    variance:v
   }))
 
   return (
 
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={240}>
 
       <BarChart data={chartData}>
 
-        <XAxis dataKey="component" />
-        <YAxis />
+        <XAxis dataKey="pc" stroke="#c084fc"/>
 
-        <Tooltip />
+        <YAxis stroke="#c084fc"/>
+
+        <Tooltip/>
 
         <Bar
           dataKey="variance"
@@ -38,3 +39,4 @@ export default function PCAVarianceSpectrum({ data }) {
 
   )
 }
+

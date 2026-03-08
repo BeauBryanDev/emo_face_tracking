@@ -1,240 +1,360 @@
-import React, { useEffect, useState } from 'react'
-import { getPcaVisualization, getSessionEmbeddingHistory, storeSessionEmbedding, clearSessionEmbeddings } from '../api/analytics'
-import Text from '../components/ui/Text'
-import PcaScatterPlot from '../components/PcaScatterPlot'
-import SessionEmbeddingManager from '../components/SessionEmbeddingManager'
+// =============================================================================
+// frontend/src/pages/Analytics.jsx
+//
+// Biometric analytics dashboard. Consumes:
+//   GET    /api/v1/analytics/pca             -> 3D PCA scatter plot payload
+//   GET    /api/v1/analytics/session/history -> session embedding list
+//   DELETE /api/v1/analytics/session         -> clear session embeddings
+//
+// Layout:
+//   Row 1: PCA stats cards (total points, variance explained, user point)
+//   Row 2: PCA scatter plot (SVG, interactive hover)
+//   Row 3: Session history table + clear button
+// =============================================================================
 
-const Analytics = () => {
-  const [payload, setPayload] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [pcaHint, setPcaHint] = useState(null)
-  const [sessionHistory, setSessionHistory] = useState([])
+import React, { useEffect, useState, useMemo, useRef, useCallback } from 'react';
+import { getPcaVisualization } from '../api/analytics';
+import { BarChart2, Info, Target, Crosshair } from 'lucide-react';
+import Text from '../components/ui/Text';
 
-  const fetchData = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      setPcaHint(null)
-      const data = await getPcaVisualization()
-      const history = await getSessionEmbeddingHistory(50)
-      setPayload(data)
-      setSessionHistory(history?.records || [])
-    } catch (e) {
-      const status = e?.response?.status
-      const detail = e?.response?.data?.detail
-      if (status === 422 && typeof detail === 'string' && detail.toLowerCase().includes('insufficient')) {
-        setPcaHint(detail)
-      } else {
-        setError('CRITICAL: FAILED_TO_SYNC_LATENT_SPACE')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
+// -----------------------------------------------------------------------------
+// TACTICAL UI COMPONENTS
+// Military-grade cyberpunk containers with neon accents.
+// -----------------------------------------------------------------------------
+const TacticalCard = ({ children, className = "" }) => (
+  <div className={`relative bg-surface-1 border border-purple-800/50 p-5 shadow-[inset_0_0_20px_rgba(74,0,128,0.15)] ${className}`}>
+    {/* HUD Corner Brackets */}
+    <div className="absolute top-0 left-0 w-3 h-3 border-t border-l border-purple-400" />
+    <div className="absolute bottom-0 right-0 w-3 h-3 border-b border-r border-purple-400" />
+    {children}
+  </div>
+);
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
-  const handleStoreEmbedding = async (embedding, sessionId) => {
-    try {
-      await storeSessionEmbedding(embedding, sessionId)
-      const history = await getSessionEmbeddingHistory(50)
-      setSessionHistory(history?.records || [])
-      // Refresh PCA if success
-      const updatedPca = await getPcaVisualization()
-      setPayload(updatedPca)
-    } catch (e) {
-      alert('STORAGE_PROTOCOL_FAILED: CHECK_CONSOLE_LOGS')
-    }
-  }
-
-  const handleClearSessions = async () => {
-    if (!window.confirm('PURGE_ALL_VECTORS: ARE_YOU_SURE?')) return
-    try {
-      await clearSessionEmbeddings()
-      setSessionHistory([])
-      setPayload(prev => ({ ...prev, points: [] }))
-    } catch (e) {
-      alert('CLEAR_OPERATIONS_ABORTED: SYSTEM_LOCK_ENGAGED')
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-neon-purple border-t-transparent rounded-full animate-spin shadow-neon-sm" />
-          <Text variant="mono" className="animate-pulse text-purple-400 tracking-[0.3em]">
-            SYNCHRONIZING_LATENT_SPACE...
-          </Text>
-        </div>
+const StatCard = ({ label, value, sub, highlightColor = 'text-neon-purple' }) => (
+  <TacticalCard>
+    <div className="font-mono text-[10px] tracking-[0.2em] text-purple-400 mb-2">
+      {label}
+    </div>
+    <div className={`font-display text-4xl font-black leading-none drop-shadow-[0_0_12px_currentColor] ${highlightColor}`}>
+      {value}
+    </div>
+    {sub && (
+      <div className="font-mono text-[10px] text-purple-500 mt-2 tracking-wider">
+        {sub}
       </div>
-    )
-  }
+    )}
+  </TacticalCard>
+);
 
-  if (error && !pcaHint) {
-    return (
-      <div className="p-6 h-screen flex items-center justify-center bg-surface-0">
-        <div className="bg-purple-900/20 border border-red-500/50 p-8 flex flex-col items-center gap-4">
-          <div className="text-red-500 text-4xl">⚠</div>
-          <Text variant="mono" className="text-red-500 font-bold">{error}</Text>
-          <button
-            onClick={fetchData}
-            className="mt-4 px-4 py-2 bg-red-500/10 border border-red-500 text-red-500 font-mono text-xs hover:bg-red-500 hover:text-white transition-all shadow-neon-sm"
-          >
-            RETRY_SYNC_SEQUENCE
-          </button>
-        </div>
-      </div>
-    )
-  }
+// -----------------------------------------------------------------------------
+// PCA SCATTER PLOT ENGINE (SVG)
+// Projects high-dimensional face embeddings into 2D latent space.
+// -----------------------------------------------------------------------------
+const PCAScatter = ({ points }) => {
+  const svgRef = useRef(null);
+  const [tooltip, setTooltip] = useState(null);
+
+  // SVG Coordinate System Dimensions
+  const W = 800;
+  const H = 400;
+  const PAD = 40;
+
+  // Dynamic boundary calculation to auto-scale the scatter plot
+  const bounds = useMemo(() => {
+    if (!points.length) return { minX: -1, maxX: 1, minY: -1, maxY: 1 };
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of points) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+    // Add 15% padding to the mathematical bounds for visual breathing room
+    const dx = (maxX - minX) * 0.15 || 0.15;
+    const dy = (maxY - minY) * 0.15 || 0.15;
+    return { minX: minX - dx, maxX: maxX + dx, minY: minY - dy, maxY: maxY + dy };
+  }, [points]);
+
+  // Project mathematical coordinates into SVG space
+  const project = (p) => ({
+    cx: PAD + ((p.x - bounds.minX) / (bounds.maxX - bounds.minX)) * (W - PAD * 2),
+    cy: PAD + ((p.y - bounds.minY) / (bounds.maxY - bounds.minY)) * (H - PAD * 2),
+  });
+
+  const getPointTheme = (p) => {
+    if (p.is_current_user) return { color: '#00ff88', radius: 6, glow: 'glow-green' };
+    if (p.source === 'registered') return { color: '#bf00ff', radius: 4, glow: 'glow-purple' };
+    return { color: '#cc44ff', radius: 3, glow: 'glow-faded' };
+  };
 
   return (
-    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6 relative overflow-hidden">
+    <div className="relative w-full overflow-hidden bg-surface-2 border border-purple-900">
+      
+      {/* Target Crosshair Decoration */}
+      <Crosshair className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 text-purple-900/30 pointer-events-none animate-[spin_60s_linear_infinite]" />
 
-      {/* BACKGROUND ACCENTS */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-neon-purple/50 to-transparent animate-scan-fast pointer-events-none" />
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-neon-purple/5 rounded-full blur-[150px] pointer-events-none" />
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${W} ${H}`}
+        className="w-full h-auto cursor-crosshair"
+        onMouseLeave={() => setTooltip(null)}
+      >
+        {/* Tactical Grid Overlay */}
+        {[0.25, 0.5, 0.75].map((t) => (
+          <g key={`grid-${t}`}>
+            <line
+              x1={PAD + t * (W - PAD * 2)} y1={PAD}
+              x2={PAD + t * (W - PAD * 2)} y2={H - PAD}
+              stroke="rgba(170,0,255,0.15)" strokeWidth="1" strokeDasharray="4 4"
+            />
+            <line
+              x1={PAD} y1={PAD + t * (H - PAD * 2)}
+              x2={W - PAD} y2={PAD + t * (H - PAD * 2)}
+              stroke="rgba(170,0,255,0.15)" strokeWidth="1" strokeDasharray="4 4"
+            />
+          </g>
+        ))}
 
-      {/* DASHBOARD TOP BAR */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between border-b border-purple-800/40 pb-6 gap-4 relative">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-6 bg-neon-purple shadow-neon-sm" />
-            <Text variant="h2" className="tracking-tighter text-3xl uppercase font-black">LATENT_SPACE_VISUALIZER</Text>
+        {/* Axes Labels */}
+        <text x={W / 2} y={H - 10} textAnchor="middle" fill="rgba(170,0,255,0.5)" className="font-mono text-xs tracking-widest">
+          PRINCIPAL COMPONENT 1 (PC1)
+        </text>
+        <text x={15} y={H / 2} textAnchor="middle" fill="rgba(170,0,255,0.5)" className="font-mono text-xs tracking-widest" transform={`rotate(-90, 15, ${H / 2})`}>
+          PRINCIPAL COMPONENT 2 (PC2)
+        </text>
+
+        {/* Data Points Rendering */}
+        {points.map((p, i) => {
+          const { cx, cy } = project(p);
+          const theme = getPointTheme(p);
+          
+          return (
+            <g key={i}
+              onMouseEnter={(e) => {
+                const rect = svgRef.current.getBoundingClientRect();
+                // Calculate relative position to SVG container for tooltip
+                const scaleX = W / rect.width;
+                const scaleY = H / rect.height;
+                setTooltip({
+                  x: (e.clientX - rect.left) * scaleX,
+                  y: (e.clientY - rect.top) * scaleY,
+                  point: p,
+                });
+              }}
+              className="transition-transform duration-200 hover:scale-150 origin-center cursor-crosshair"
+              style={{ transformOrigin: `${cx}px ${cy}px` }}
+            >
+              {/* Radar pulse for current user */}
+              {p.is_current_user && (
+                <circle cx={cx} cy={cy} r={theme.radius * 2.5} fill="none" stroke={theme.color} strokeWidth="1" className="animate-ping opacity-75" />
+              )}
+              {/* Core point */}
+              <circle cx={cx} cy={cy} r={theme.radius} fill={theme.color} className={theme.glow} />
+            </g>
+          );
+        })}
+
+        {!points.length && (
+          <text x={W / 2} y={H / 2} textAnchor="middle" fill="rgba(170,0,255,0.5)" className="font-mono text-sm tracking-widest">
+            AWAITING VECTOR INGESTION...
+          </text>
+        )}
+      </svg>
+
+      {/* Floating Tactical Tooltip */}
+      {tooltip && (
+        <div 
+          className="absolute z-50 bg-purple-950/95 border border-neon-purple p-3 shadow-neon-md pointer-events-none backdrop-blur-sm"
+          style={{
+            // Convert SVG coordinates back to CSS percentage for absolute positioning
+            left: `${(tooltip.x / W) * 100}%`,
+            top: `${(tooltip.y / H) * 100}%`,
+            transform: 'translate(-50%, -120%)'
+          }}
+        >
+          <div className="absolute bottom-[-6px] left-1/2 -translate-x-1/2 w-3 h-3 bg-purple-950 border-b border-r border-neon-purple rotate-45" />
+          
+          <div className={`font-mono text-xs font-bold tracking-widest mb-1 ${tooltip.point.is_current_user ? 'text-green-400' : 'text-neon-purple'}`}>
+            {tooltip.point.is_current_user ? 'TARGET: OPERATOR' : `TARGET: ENTITY ${tooltip.point.user_id}`}
           </div>
-          <Text variant="mono" className="text-purple-500 text-[10px] tracking-[0.2em] ml-4 font-bold">
-            PCA_ENGINE: ARCFACE_512D_REDUCTION // VARIANCE: {(payload?.total_variance || 0).toFixed(4)}
+          <div className="font-mono text-[10px] text-purple-300 tracking-wider flex flex-col gap-0.5">
+            <span>SRC: {tooltip.point.source.toUpperCase()}</span>
+            <span>PC1: {tooltip.point.x.toFixed(4)}</span>
+            <span>PC2: {tooltip.point.y.toFixed(4)}</span>
+            <span>PC3: {tooltip.point.z.toFixed(4)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Military Legend */}
+      <div className="absolute bottom-4 right-4 flex flex-col gap-2 bg-surface-1/80 p-3 border border-purple-800/50 backdrop-blur-md">
+        {[
+          { color: 'bg-green-400', label: 'OPERATOR ID' },
+          { color: 'bg-neon-purple', label: 'DB ENTITIES' },
+          { color: 'bg-purple-500', label: 'TRANSIENT SESSIONS' },
+        ].map(({ color, label }) => (
+          <div key={label} className="flex items-center gap-2">
+            <div className={`w-2 h-2 ${color} rounded-full shadow-[0_0_5px_currentColor]`} />
+            <span className="font-mono text-[9px] tracking-widest text-purple-200">
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+// -----------------------------------------------------------------------------
+// MAIN ANALYTICS VIEW
+// Unifies V1 Header/Footer with V2 SVG rendering capabilities.
+// -----------------------------------------------------------------------------
+const Analytics = () => {
+  const [payload, setPayload] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pcaHint, setPcaHint] = useState(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setPcaHint(null);
+    try {
+      // Fetch only PCA visualization data, ignoring deprecated cache logs
+      const pcaData = await getPcaVisualization();
+      setPayload(pcaData);
+    } catch (e) {
+      const detail = e?.response?.data?.detail || '';
+      if (e?.response?.status === 422 && detail.toLowerCase().includes('insufficient')) {
+        setPcaHint(detail);
+      } else {
+        setError('FATAL EXCEPTION: PCA MANIFOLD GENERATION FAILED.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const points = payload?.points || [];
+  const totalVariance = payload?.total_variance || 0;
+  const variancePerComp = payload?.explained_variance || [];
+  const currentUserPts = points.filter((p) => p.is_current_user).length;
+
+  return (
+    <div className="p-6 min-h-[calc(100vh-80px)] bg-surface-0 bg-cyber-grid flex flex-col gap-6">
+      
+      {/* GLOBAL GLOW ANIMATIONS */}
+      <style>{`
+        .glow-green { filter: drop-shadow(0 0 8px rgba(0, 255, 136, 0.9)); }
+        .glow-purple { filter: drop-shadow(0 0 6px rgba(191, 0, 255, 0.8)); }
+        .glow-faded { filter: drop-shadow(0 0 4px rgba(204, 68, 255, 0.4)); }
+      `}</style>
+
+      {/* V1 HEADER RETAINED AND UPGRADED */}
+      <div className="border-b border-purple-800 pb-4 flex justify-between items-end">
+        <div>
+          <Text variant="h2" glow className="flex items-center gap-3 text-purple-100">
+            <Target className="w-7 h-7 text-neon-purple" />
+            PCA ANALYTICS
+          </Text>
+          <Text variant="mono" className="mt-2 text-purple-400">
+            BIOMETRIC LATENT SPACE PROJECTION // DIMENSIONALITY REDUCTION
           </Text>
         </div>
-
-        <div className="flex items-center gap-6">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Global Nodes</span>
-            <span className="text-2xl font-display text-neon-purple glow-sm">{payload?.total_points || 0}</span>
-          </div>
-          <div className="h-10 w-[1px] bg-purple-800/50" />
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-mono text-purple-500 uppercase tracking-widest">Sync Priority</span>
-            <span className="text-2xl font-display text-neon-purple glow-sm">STABLE</span>
-          </div>
+        <div className="text-right hidden md:block">
+          <Text variant="mono" className="text-neon-purple font-bold">
+            VECTORS: {payload?.total_points || 0}
+          </Text>
+          <Text variant="subtext" className="text-purple-500">
+            VARIANCE: {(totalVariance * 100).toFixed(1)}%
+          </Text>
         </div>
       </div>
 
-      {/* MAIN CONTENT GRID */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 flex-1">
+      {loading && (
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[400px]">
+          <BarChart2 className="w-12 h-12 text-neon-purple animate-pulse mb-4" />
+          <Text variant="mono" className="text-purple-400 animate-pulse tracking-[0.3em]">
+            COMPUTING EIGENVECTORS...
+          </Text>
+        </div>
+      )}
 
-        {/* LEFT PANEL: SCATTERPLOT VISUALIZATION (8/12) */}
-        <div className="lg:col-span-8 flex flex-col gap-4">
-          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative flex-1 min-h-[500px]">
-            {/* MODULE FRAME */}
-            <div className="absolute -top-[1px] -right-[1px] w-8 h-8 border-t border-r border-neon-purple z-10" />
-            <div className="absolute bottom-4 right-4 z-20">
-              <div className="flex gap-2">
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-[#00ff88]" />
-                  <span className="text-[8px] text-purple-400 font-mono">SELF</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-[#bf00ff]" />
-                  <span className="text-[8px] text-purple-400 font-mono">ENROLLED</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="w-2 h-2 bg-[#cc44ff]" />
-                  <span className="text-[8px] text-purple-400 font-mono">SESSION</span>
-                </div>
-              </div>
-            </div>
+      {error && !loading && (
+        <TacticalCard className="border-red-900 bg-red-950/20 text-center py-10">
+          <Text variant="mono" className="text-red-500 tracking-widest">{error}</Text>
+        </TacticalCard>
+      )}
 
-            <div className="p-4 h-full flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <Text variant="subtext" className="text-[10px] text-purple-400 font-bold uppercase tracking-widest">01 // TOPOLOGICAL_EMBEDDING_MAP</Text>
-                <div className="flex gap-1">
-                  <div className="w-8 h-[2px] bg-neon-purple/20" />
-                  <div className="w-1 h-[2px] bg-neon-purple" />
-                </div>
-              </div>
-
-              {pcaHint ? (
-                <div className="flex-1 flex items-center justify-center border border-purple-900 bg-purple-950/20 m-4 shadow-inner">
-                  <div className="max-w-md p-8 bg-surface-2 border border-purple-800 text-center flex flex-col gap-4 relative">
-                    <div className="absolute inset-0 border border-neon-purple/20 animate-pulse pointer-events-none" />
-                    <div className="text-neon-purple font-mono text-sm leading-relaxed tracking-tight group">
-                      {pcaHint}
-                    </div>
-                    <div className="h-[1px] bg-purple-800/50 w-full" />
-                    <Text variant="mono" className="text-purple-500 text-[10px] uppercase">
-                      Protocol: Enroll 3+ biometric profiles or store session vectors to generate map.
-                    </Text>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1">
-                  <PcaScatterPlot points={payload?.points || []} />
-                </div>
-              )}
+      {pcaHint && !loading && (
+        <TacticalCard className="border-yellow-900/50 bg-yellow-900/10">
+          <div className="flex gap-4 items-start">
+            <Info className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+            <div>
+              <Text variant="mono" className="text-yellow-400 mb-1">{pcaHint}</Text>
+              <Text variant="subtext" className="text-purple-400">
+                SYSTEM REQUIREMENT: PCA MATRIX REQUIRES A MINIMUM OF 3 VECTORS TO ESTABLISH LATENT SPACE.
+                ENROLL ADDITIONAL SUBJECTS OR CAPTURE LIVE TELEMETRY.
+              </Text>
             </div>
           </div>
+        </TacticalCard>
+      )}
 
-          {/* TELEMETRY READOUT (BOTTOM STRIP) */}
-          <div className="bg-surface-1/40 border border-purple-800/40 p-3 flex justify-between items-center overflow-hidden">
-            <div className="flex gap-6 overflow-hidden">
-              <div className="flex flex-col min-w-[120px]">
-                <span className="text-[7px] text-purple-600 font-mono uppercase">DATA_SOURCE</span>
-                <span className="text-[10px] text-purple-200 font-mono font-black">NEURALCORE_PRIMARY</span>
-              </div>
-              <div className="flex flex-col min-w-[120px]">
-                <span className="text-[7px] text-purple-600 font-mono uppercase">LATENCY_SYNC</span>
-                <span className="text-[10px] text-purple-200 font-mono font-black">2.4ms_ENCRYPTED</span>
-              </div>
-              <div className="flex flex-col min-w-[120px]">
-                <span className="text-[7px] text-purple-600 font-mono uppercase">PCA_ALGO</span>
-                <span className="text-[10px] text-purple-200 font-mono font-black">RECURSIVE_SVD</span>
+      {!loading && !error && !pcaHint && payload && (
+        <div className="flex flex-col gap-6">
+          
+          {/* METRICS ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <StatCard 
+              label="TOTAL EMBEDDINGS" 
+              value={payload.total_points} 
+              sub="POINTS IN LATENT MANIFOLD"
+              highlightColor="text-purple-200"
+            />
+            <StatCard 
+              label="EXPLAINED VARIANCE" 
+              value={`${(totalVariance * 100).toFixed(1)}%`} 
+              sub="INFORMATION RETAINED BY 3D PROJECTION"
+              highlightColor="text-green-400"
+            />
+            <StatCard 
+              label="OPERATOR VECTORS" 
+              value={currentUserPts} 
+              sub="AUTHORIZED SESSIONS DETECTED"
+              highlightColor="text-neon-purple"
+            />
+          </div>
+
+          {/* MAIN PROJECTION HUD */}
+          <TacticalCard>
+            <div className="flex items-center justify-between mb-4 border-b border-purple-900/50 pb-2">
+              <Text variant="mono" className="text-purple-300 flex items-center gap-2">
+                <Crosshair className="w-4 h-4" /> SPATIAL PROJECTION
+              </Text>
+              <div className="hidden md:flex gap-4">
+                {variancePerComp.slice(0, 3).map((v, i) => (
+                  <Text key={`var-${i}`} variant="subtext" className="text-purple-500">
+                    PC{i + 1}: {(v * 100).toFixed(1)}%
+                  </Text>
+                ))}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-neon-purple shadow-neon-sm animate-pulse" />
-              <span className="text-[8px] font-mono text-neon-purple font-black tracking-widest">LIVE_STREAM_ACTIVE</span>
-            </div>
-          </div>
+            
+            <PCAScatter points={points} />
+          </TacticalCard>
         </div>
+      )}
 
-        {/* RIGHT PANEL: SESSION MANAGEMENT (4/12) */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
-          <div className="bg-surface-1/40 border border-purple-800/40 p-1 relative flex-1 flex flex-col">
-            <div className="absolute bottom-0 left-0 w-8 h-8 border-b border-l border-neon-purple z-10" />
-            <div className="p-4 flex-1 flex flex-col">
-              <SessionEmbeddingManager
-                history={sessionHistory}
-                onStore={handleStoreEmbedding}
-                onClear={handleClearSessions}
-                error={error}
-              />
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      {/* SYSTEM STATUS FOOTER */}
-      <div className="mt-4 flex items-center justify-between text-[8px] font-mono text-purple-600 tracking-[0.3em] border-t border-purple-800/20 pt-4 uppercase">
-        <div className="flex gap-8">
-          <span>COORDS: [34.0522, -118.2437]</span>
-          <span>IDENT_PROTO: ARC_V2</span>
-          <span>BUFFER: CACHE_SECURE</span>
-        </div>
-        <div className="flex gap-4 items-center">
-          <span className="animate-pulse">S Y S T E M _ O N L I N E</span>
-          <div className="flex gap-0.5">
-            {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-1 h-3 bg-neon-purple ${i % 2 === 0 ? 'opacity-20' : 'opacity-100'}`} />)}
-          </div>
-        </div>
+      {/* V1 FOOTER RETAINED */}
+      <div className="mt-auto pt-6 border-t border-purple-800/50 text-center">
+        <Text variant="subtext" className="text-purple-600">
+          [ SYS.RES.PCA_COMPUTATION_COMPLETE ] // LATENT SPACE MAPPED AND SECURED
+        </Text>
       </div>
 
     </div>
-  )
-}
+  );
+};
 
-export default Analytics
+export default Analytics;

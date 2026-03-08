@@ -1,32 +1,35 @@
 export default function PCALegend({ data }) {
 
-  const clusters = data?.clusters || []
+  if (!data?.points) return null
 
   return (
 
-    <div style={{ padding: 20 }}>
+    <div style={{ padding:20 }}>
 
-      <h3>Emotion Clusters</h3>
+      <h3>Users</h3>
 
-      {clusters.map(c => (
+      {data.points.map(p => (
 
         <div
-          key={c.id}
+          key={p.user_id}
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8
+            display:"flex",
+            justifyContent:"space-between",
+            marginBottom:6
           }}
         >
 
-          <span>{c.label}</span>
+          <span>{p.label}</span>
 
-          <span>{c.size}</span>
+          <span>
+            {p.is_current_user ? "YOU" : ""}
+          </span>
 
         </div>
 
       ))}
 
     </div>
+
   )
 }

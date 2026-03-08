@@ -9,29 +9,23 @@ import {
 
 export default function PCACumulativeVariance({ data }) {
 
-  const variance = data?.variance || []
+  if (!data?.cumulative_variance) return null
 
-  let cumulative = 0
-
-  const chartData = variance.map((v,i)=>{
-    cumulative += v
-
-    return {
-      component: `PC${i+1}`,
-      cumulative
-    }
-  })
+  const chartData = data.cumulative_variance.map((v,i)=>({
+    component:`PC${i+1}`,
+    cumulative:v
+  }))
 
   return (
 
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={240}>
 
       <LineChart data={chartData}>
 
-        <XAxis dataKey="component" />
-        <YAxis />
+        <XAxis dataKey="component"/>
+        <YAxis/>
 
-        <Tooltip />
+        <Tooltip/>
 
         <Line
           type="monotone"
