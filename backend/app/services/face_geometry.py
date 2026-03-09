@@ -420,10 +420,15 @@ def analyze_expression_state(
 
     # Smile ratio (normalized mouth width)
     smile_ratio = mouth_width / interocular_distance
-    smile_score = round(float(smile_ratio), 3)
+    smile_score = round(float(smile_ratio) * ( 1 - mar ), 3)
 
     # Smile heuristic
-    is_smiling = smile_ratio > 0.55 and mar < 0.45
+    smile_threshold = 0.55
+
+    is_smiling = (
+        smile_ratio > smile_threshold
+        and mar < 0.40
+    )
     
     # --- Duchenne smile proxy (eye contraction) ---
     # When smiling genuinely, eyes narrow slightly
@@ -440,9 +445,17 @@ def analyze_expression_state(
         mar_variance = float(np.var(mar_series))
         talk_score = round(mar_variance * 10, 3)
 
-        if mar_variance > 0.0025:
+        mar_series = np.array(mar_series)
+
+        mar_std = float(np.std(mar_series))
+        mar_delta = float(np.mean(np.abs(np.diff(mar_series))))
+        # RE COMPUTE TALK SCORE WITH STD AND DELTA
+        talk_score = round((mar_std + mar_delta) * 5, 3)
+
+        if talk_score > 0.04:
             
             is_talking = True
+            
 
     elif prev_mar is not None:
         
@@ -513,6 +526,13 @@ def analyze_face_geometry(
             - head_pose (dict): Orientation angles and pose classification.
             All data is formatted for JSON serialization and WebSocket transmission.
     """
+    
+    expression_data = {
+    "expressions": {...},
+    "attention": {...}
+    }
+
+    
     try:
         
         # Perform individual geometric calculations

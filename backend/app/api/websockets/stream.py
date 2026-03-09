@@ -16,12 +16,16 @@ from app.utils.image_processing import decode_base64_image, decode_jpeg_bytes, a
 from app.services.face_math import verify_biometric_match
 #from app.models.emotions import Emotion 
 from app.services.face_geometry import analyze_face_geometry
+from app.services.face_geometry import EAR_BLINK_THRESHOLD
+from app.utils.visual_debug import draw_geometry_overlay
 from app.core.logging import get_logger
 
 
 logger = get_logger(__name__)
 
 router = APIRouter()
+
+DEBUG_OVERLAY = True  # Set to False to disable geometry debug overlay on output frames
 
 
 @router.websocket("/ws/stream")
@@ -164,12 +168,31 @@ async def websocket_endpoint(
                 mar_series=list(mar_buffer)
             )
             
+            # Draw Geometry Debug Overlay
+            image = draw_geometry_overlay(image, landmarks, geometry_data)
+            #  send edited frame to frontend
+            # await websocket.send_bytes(image)
+            # cv2.imencode → websocket
+
+            analytics_metrics = {
+                "timestamp": time.time(),
+                "ear": geometry_data["ear"]["ear"],
+                "mar": geometry_data["mar"]["mar"],
+                "yaw": geometry_data["head_pose"]["yaw"],
+                "pitch": geometry_data["head_pose"]["pitch"],
+                "smile_score": geometry_data["expressions"]["smile_score"],
+                "talk_score": geometry_data["expressions"]["talk_score"],
+                "happy_score": geometry_data["expressions"]["happy_score"],
+                "engagement_score": geometry_data["expressions"]["engagement_score"]
+            }
+
+            
             # Update MAR temporal buffer
             current_mar = geometry_data["mar"]["mar"]
             mar_buffer.append(current_mar)
             prev_mar = current_mar
                         
-            if geometry_data["ear"]["ear"] < 0.22:
+            if geometry_data["ear"]["ear"] < EAR_BLINK_THRESHOLD:
                 
                 
                 consecutive_low_ear_frames += 1
@@ -271,6 +294,8 @@ async def websocket_endpoint(
             response_data["geometry"] = geometry_data
             response_data["metrics"] = metrics
             response_data["ml_pipeline"] = ml_pipeline
+            response_data["analytics"] = analytics_metrics
+
 
             
             # Keep request/response on the same websocket connection to avoid
@@ -278,15 +303,26 @@ async def websocket_endpoint(
             await websocket.send_json(response_data)
 
     except WebSocketDisconnect:
+        
+        logger.info("User %s disconnected from stream", user.id)
         pass
+    
     except RuntimeError as e:
+        
         # Starlette can raise this when disconnect was already consumed.
         if "disconnect message" in str(e):
+            
             pass
+        
         else:
+            
             logger.exception("Runtime error in user %s stream: %s", user.id, str(e))
+            
     except Exception as e:
+        
         logger.exception("Error in user %s stream: %s", user.id, str(e))
+        
     finally:
+        
         manager.disconnect(user.id)
 

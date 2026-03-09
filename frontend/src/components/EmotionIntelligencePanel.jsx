@@ -5,6 +5,8 @@ import PredictionStability from "./PredictionStability"
 import EmotionActivityTimeline from "./EmotionActivityTimeline"
 import ExpressionSignalsHUD from "./ExpressionSignalsHUD"
 import EmotionRadar from "./EmotionRadar"
+import EmotionTemporalSignalGraph from "./EmotionTemporalSignalGraph"
+
 
 
 const EmotionIntelligencePanel = ({ timeline }) => {
@@ -37,14 +39,24 @@ const EmotionIntelligencePanel = ({ timeline }) => {
     </div>
 
     <div style={{
-      display:"grid",
-      gridTemplateColumns:"1fr 1fr",
-      gap:"16px"
+      display: "grid",
+      gridTemplateColumns: "1fr 1fr",
+      gap: "16px",
+      width: "100%"
     }}>
 
-      <EmotionRadar data={timeline} />
+      <div className="bg-purple-950 border border-purple-800 p-3">
+        <EmotionRadar data={timeline} />
+      </div>
 
-      <ExpressionSignalsHUD data={timeline} />
+      <div className="bg-purple-950 border border-purple-800 p-3">
+        <ExpressionSignalsHUD data={timeline} />
+      </div>
+
+    </div>
+
+    <div className="bg-purple-950 border border-purple-800 p-3 col-span-2">
+      <EmotionTemporalSignalGraph data={timeline} />
     </div>
 
 
