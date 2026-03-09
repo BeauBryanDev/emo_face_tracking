@@ -246,20 +246,22 @@ class TestApplyPcaReduction:
     def test_output_shape_is_correct(self, embedding_matrix_10x512):
         """
         Reducing 10x512 to n_components=3 must return shape (10, 3).
+        apply_pca_reduction now returns a dict; reduced data is in ["reduced_embeddings"].
         """
         input_list = [embedding_matrix_10x512]   # lista con una matriz 2D
         result = apply_pca_reduction_batch(input_list, n_components=3)
-        assert result[0].shape == (10, 3)
+        assert result[0]["reduced_embeddings"].shape == (10, 3)
 
     
     
     def test_output_shape_128_components(self, embedding_matrix_10x512):
         """
         Default reduction to 128 components from 512D.
+        SVD caps n_components at min(n_samples=10, n_features=512) = 10.
+        Result dict's "reduced_embeddings" must have shape (10, 10).
         """
-        # mathematical constraint of SVD.
         result = apply_pca_reduction(embedding_matrix_10x512, n_components=128)
-        assert result.shape == (10, 10)
+        assert result["reduced_embeddings"].shape == (10, 10)
         
         
     def test_returns_original_if_components_gte_features(
@@ -284,21 +286,18 @@ class TestApplyPcaReduction:
         """
         result_3  = apply_pca_reduction(embedding_matrix_10x512, n_components=3)
         result_10 = apply_pca_reduction(embedding_matrix_10x512, n_components=10)
-        
-        norm_3  = float(np.linalg.norm(result_3))
-        norm_10 = float(np.linalg.norm(result_10))
-        
+
+        norm_3  = float(np.linalg.norm(result_3["reduced_embeddings"]))
+        norm_10 = float(np.linalg.norm(result_10["reduced_embeddings"]))
+
         assert norm_10 >= norm_3, (
             "Higher n_components should preserve more variance (higher norm)."
         )
      
     def test_output_is_ndarray(self, embedding_matrix_10x512):
-        
-        """Output must be numpy ndarray, not list or other type."""
-        
+        """reduced_embeddings inside the result dict must be a numpy ndarray."""
         result = apply_pca_reduction(embedding_matrix_10x512, n_components=3)
-        
-        assert isinstance(result, np.ndarray) 
+        assert isinstance(result["reduced_embeddings"], np.ndarray)
         
         
     def test_centering_removes_mean(self, embedding_matrix_10x512):
@@ -307,7 +306,7 @@ class TestApplyPcaReduction:
         data should be close to zero along each component.
         """
         result = apply_pca_reduction(embedding_matrix_10x512, n_components=3)
-        column_means = np.abs(np.mean(result, axis=0))
+        column_means = np.abs(np.mean(result["reduced_embeddings"], axis=0))
         assert np.all(column_means < 1.0), (
             f"Column means after PCA should be near zero, got {column_means}"
         )
@@ -331,12 +330,13 @@ class TestApplyPcaReductionBatch:
         
     def test_each_element_has_correct_shape(self, embedding_matrix_10x512):
         """
-        Each element in the output list must have shape (10, n_components).
+        Each element in the output list is a dict; reduced_embeddings must
+        have shape (10, n_components).
         """
         input_list = [embedding_matrix_10x512]
         result = apply_pca_reduction_batch(input_list, n_components=3)
-        
-        assert result[0].shape == (10, 3)
+
+        assert result[0]["reduced_embeddings"].shape == (10, 3)
         
         
     def test_empty_list_returns_empty_list(self):
@@ -350,14 +350,15 @@ class TestApplyPcaReductionBatch:
         
     def test_single_element_matches_non_batch(self, embedding_matrix_10x512):
         """
-        Batch with one element must produce the same result as calling
-        apply_pca_reduction directly.
+        Batch with one element must produce the same reduced_embeddings as
+        calling apply_pca_reduction directly.
         """
         batch_result  = apply_pca_reduction_batch(
-            
             [embedding_matrix_10x512], n_components=3
         )
-        
         single_result = apply_pca_reduction(embedding_matrix_10x512, n_components=3)
-        
-        np.testing.assert_array_almost_equal(batch_result[0], single_result)
+
+        np.testing.assert_array_almost_equal(
+            batch_result[0]["reduced_embeddings"],
+            single_result["reduced_embeddings"]
+        )

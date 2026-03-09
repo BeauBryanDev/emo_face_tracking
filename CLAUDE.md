@@ -1,303 +1,240 @@
-# FaceEmotionTrackAI - Project Guidelines for Claude
+# CLAUDE.md
 
-> **Note**: This project was started and developed by the project owner before Claude's involvement. Claude is assisting with testing, debugging, and improvements.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+> This project was built by the owner before Claude's involvement. Claude's role is to assist with testing, debugging, and improvements — not to rebuild or over-engineer.
 
 ## Project Overview
 
-**FaceEmotionTrackAI** is an AI-powered Face Emotion and Biometric Tracking System that provides real-time face detection, emotion recognition, liveness detection, and biometric similarity analysis.
+**FaceEmotionTrackAI** is a real-time face analysis system providing face detection, emotion recognition, liveness detection, and biometric similarity matching via a streaming WebSocket API.
 
-### Tech Stack
-- **Backend**: FastAPI (Python 3.12)
-- **Database**: PostgreSQL with pgvector extension
-- **ML Models**: ONNX Runtime (detection, recognition, liveness, emotion)
-- **Frontend**: React (assumed, WebSocket connection)
-- **Computer Vision**: OpenCV, NumPy
-- **Deployment**: Docker containers
+**Tech Stack**: FastAPI (Python 3.12) · PostgreSQL + pgvector · ONNX Runtime · React 18 + Vite + Three.js · Docker
 
-### Architecture
-- RESTful API with WebSocket support for real-time streaming
-- Microservices architecture (backend + PostgreSQL containers)
-- ML inference engine with 4 ONNX models loaded in memory
-- Vector similarity search for face embeddings (512D ArcFace)
-- PCA analytics for dimensionality reduction
+**ML Pipeline order**: SCRFD (detection) → MiniFASNetV2 (liveness) → ArcFace (512D embeddings) → EmotiEffLib (emotion)
 
-## Directory Structure
+## Commands
 
-```
-FaceEmotionTrackAI/
-├── backend/
-│   ├── app/
-│   │   ├── api/
-│   │   │   ├── routers/          # REST endpoints (auth, users, emotions, analytics)
-│   │   │   └── websockets/       # WebSocket stream endpoint
-│   │   ├── core/                 # Config, database, security, logging
-│   │   ├── models/               # SQLAlchemy ORM models (users, emotions, face_session)
-│   │   ├── services/             # Business logic (inference_engine, face_geometry, etc.)
-│   │   └── main.py              # FastAPI app entry point
-│   ├── tests/
-│   │   ├── conftest.py          # Shared pytest fixtures
-│   │   ├── test_integration_auth.py
-│   │   └── test_*.py            # Unit and integration tests
-│   ├── requirements.txt
-│   └── Dockerfile
-├── privates/                     # Private notes and documentation
-└── CLAUDE.md                    # This file
-```
+### Backend (via Docker)
 
-## Critical Rules - DO NOT VIOLATE
-
-### 🚫 Absolutely NO modifications to `app/` directory
-- **NEVER** edit production code in `backend/app/` unless explicitly requested
-- All test fixes must be in `backend/tests/` only
-- Use mocking, patching, and dependency overrides instead
-- If a bug is found in app/, report it to the user first
-
-### ⚠️ Code Quality Standards
-- **No over-engineering**: Only make changes directly requested
-- **No premature optimization**: Don't add features "for the future"
-- **No unnecessary abstractions**: Three similar lines > premature abstraction
-- **No extra error handling**: Only validate at system boundaries
-- **No extra comments/docstrings**: Only add to code you create/modify
-- Keep solutions simple and focused
-
-### 🔒 Security Guidelines
-- Never commit secrets, .env files, or credentials
-- Always validate user input at API boundaries
-- Use parameterized queries (SQLAlchemy ORM does this)
-- No SQL injection, XSS, or command injection vulnerabilities
-- Follow OWASP Top 10 best practices
-
-## Testing Guidelines
-
-### Running Tests
 ```bash
 # Run all tests
 docker exec emotrack_backend pytest
 
-# Run specific test file
+# Run a specific test file
 docker exec emotrack_backend pytest tests/test_integration_auth.py
 
-# Run with verbose output
-docker exec emotrack_backend pytest tests/test_integration_auth.py -v
-
-# Run with output capture disabled (see print statements)
+# Run with verbose + print output
 docker exec emotrack_backend pytest tests/test_integration_auth.py -v -s
+
+# Lint (ruff)
+docker exec emotrack_backend ruff check app/
+
+# Database migrations
+docker exec emotrack_backend alembic revision --autogenerate -m "description"
+docker exec emotrack_backend alembic upgrade head
+
+# Debug access
+docker logs emotrack_backend
+docker exec -it emotrack_backend bash
+docker exec emotrack_backend psql -U beauAdmin -d emotrack
 ```
 
-### Test Database Setup (SQLite)
-Integration tests use an in-memory SQLite database:
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev       # Vite dev server
+npm run build     # Production build
+npm run preview   # Preview production build
+```
+
+### Docker Compose
+
+```bash
+docker compose up --build     # Start all services
+docker compose down           # Stop all services
+```
+
+## Critical Rules
+
+### No modifications to `app/` without explicit request
+- **Never** edit `backend/app/` production code unless asked
+- Test fixes go in `backend/tests/` only — use mocks and dependency overrides
+- Report bugs found in `app/` to the user first
+
+### Before committing / making architectural changes
+- Ask the user before committing, adding dependencies, or changing architecture
+- Never commit `.env` files or credentials
+
+## Architecture
+
+### Backend (`backend/app/`)
+
+| Layer | Path | Purpose |
+|-------|------|---------|
+| Routers | `api/routers/` | auth, users, emotions, inference, analytics |
+| WebSocket | `api/websockets/stream.py` | `/ws/stream` — real-time frame analysis |
+| WS Manager | `api/websockets/manager.py` | Connection registry `{user_id → WebSocket}` |
+| Config | `core/config.py` | Pydantic settings from environment |
+| DB init | `core/database.py` | Engine, `init_db()`, `get_db` dependency |
+| Session | `core/session.py` | Second `get_db` dependency (used by auth/users) |
+| Security | `core/security.py` | JWT, password hashing (passlib + bcrypt) |
+| ML Engine | `services/inference_engine.py` | Singleton loading all 4 ONNX models |
+| Face Geometry | `services/face_geometry.py` | EAR/MAR/head-pose from 5-point landmarks |
+| Face Math | `services/face_math.py` | Cosine similarity, PCA reduction |
+| Analytics | `services/analytics.py` | PCA aggregation pipeline for embeddings |
+| Models | `models/` | User, Emotion, FaceSessionEmbedding ORM models |
+| ML Weights | `ml_weights/` | `.onnx` model files (not in version control) |
+
+**`get_db` exists in TWO modules**: `core/session.py` and `core/database.py`. Different routers import from different sources. This matters for tests (see below).
+
+### WebSocket Frame Response
+`/ws/stream?token=<jwt>` returns per-frame JSON:
+```json
+{
+  "status": "success",
+  "bbox": [x1, y1, x2, y2],
+  "liveness": {"is_live": bool, "score": 0.0},
+  "biometrics": {"is_match": bool, "similarity_score": 0.0},
+  "emotion": {"dominant_emotion": "string", "confidence": 0.0, "emotion_scores": {}},
+  "geometry": {"ear": {}, "mar": {}, "head_pose": {}, "expressions": {}},
+  "metrics": {"face_detection_ms": 0.0},
+  "analytics": {"timestamp": 0.0, "ear": 0.0, "mar": 0.0}
+}
+```
+
+### Frontend (`frontend/src/`)
+React 18 + Vite + Tailwind. Key directories: `api/` (axios wrappers), `components/`, `pages/`, `hooks/`, `context/`, `core/` (WebSocket client). Uses **Three.js + @react-three/fiber** for 3D PCA scatter plot visualization, **Recharts** for 2D charts.
+
+## Testing
+
+### Integration Test Pattern
 
 ```python
-# IMPORTANT: Use shared in-memory DB with StaticPool
+from contextlib import asynccontextmanager
+from sqlalchemy.pool import StaticPool
+
+# 1. Override lifespan BEFORE creating TestClient — prevents ML loading + PG connection
+@asynccontextmanager
+async def _empty_lifespan(_app):
+    yield
+
+app.router.lifespan_context = _empty_lifespan
+
+# 2. Shared in-memory SQLite — regular sqlite:// creates a separate DB per connection!
 SQLITE_URL = "sqlite:///:memory:?cache=shared"
 
-engine = create_engine(
-    SQLITE_URL,
-    connect_args={"check_same_thread": False, "uri": True},
-    poolclass=StaticPool,  # Ensures all connections share same DB
-)
+@pytest.fixture(scope="function")
+def db_session():
+    engine = create_engine(
+        SQLITE_URL,
+        connect_args={"check_same_thread": False, "uri": True},
+        poolclass=StaticPool,
+    )
+    _patch_vector_columns()
+    Base.metadata.create_all(bind=engine)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        Base.metadata.drop_all(bind=engine)
+        engine.dispose()
+
+# 3. Override BOTH get_db imports — routers import from different modules
+from app.core.session import get_db as session_get_db
+from app.core.database import get_db as database_get_db
+
+@pytest.fixture(scope="function")
+def client(db_session):
+    def override_get_db():
+        yield db_session
+
+    app.dependency_overrides[session_get_db] = override_get_db
+    app.dependency_overrides[database_get_db] = override_get_db
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
 ```
 
-**Why?** Regular `sqlite://` creates a separate database per connection!
+**Symptom when only one `get_db` is overridden**: API reads return empty results even though test data was inserted — the route silently queries real PostgreSQL.
 
-### Handling pgvector in Tests
-PostgreSQL-specific types must be patched for SQLite:
+### Patching PostgreSQL Types for SQLite
 
 ```python
 from pgvector.sqlalchemy import Vector
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Text
+from sqlalchemy.types import TypeDecorator
 
-# Replace Vector(512) with JSON text storage for SQLite
-for mapper in Base.registry.mappers:
-    for column in mapper.mapped_table.columns:
-        if isinstance(column.type, Vector):
-            column.type = VectorAsText()  # Custom TypeDecorator
-        elif isinstance(column.type, JSONB):
-            column.type = Text()
-```
+class VectorAsText(TypeDecorator):
+    impl = Text
+    cache_ok = True
+    def process_bind_param(self, value, dialect):
+        return str(list(value)) if value is not None else None
+    def process_result_value(self, value, dialect):
+        import ast
+        return ast.literal_eval(value) if value is not None else None
 
-### Mocking the App Lifespan
-TestClient triggers the app's lifespan which loads ML models and connects to PostgreSQL. Override it:
+class JsonAsText(TypeDecorator):
+    """Use this — NOT plain Text() — for JSONB columns; plain Text() breaks dict inserts."""
+    impl = Text
+    cache_ok = True
+    def process_bind_param(self, value, dialect):
+        import json
+        return json.dumps(value) if value is not None else None
+    def process_result_value(self, value, dialect):
+        import json
+        try:
+            return json.loads(value) if value is not None else None
+        except (ValueError, TypeError):
+            return value
 
-```python
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def _empty_lifespan(_app):
-    """Empty lifespan for testing - skips DB init and ML model loading."""
-    yield
-
-# Apply BEFORE creating TestClient
-app.router.lifespan_context = _empty_lifespan
+def _patch_vector_columns():
+    for mapper in Base.registry.mappers:
+        for column in mapper.mapped_table.columns:
+            if isinstance(column.type, Vector):
+                column.type = VectorAsText()
+            elif isinstance(column.type, JSONB):
+                column.type = JsonAsText()  # NOT Text() — Text() breaks dict inserts
 ```
 
 ## Known Issues & Solutions
 
-### Issue: "no such table: users" in tests
-**Cause**: Using `sqlite://` creates separate DBs per connection
-**Solution**: Use `sqlite:///:memory:?cache=shared` with `StaticPool`
-**Reference**: `privates/test_int_auth_fix.txt`
+| Issue | Cause | Solution |
+|-------|-------|---------|
+| `no such table: users` in tests | `sqlite://` creates separate DB per connection | Use `sqlite:///:memory:?cache=shared` + `StaticPool` |
+| `ValueError: password cannot be longer than 72 bytes` | passlib 1.7.4 incompatible with bcrypt ≥ 5.0 | Pin `bcrypt==4.0.1` in requirements.txt |
+| API returns empty results despite test data | Only one `get_db` override applied | Override **both** `session.get_db` and `database.get_db` |
+| `ProgrammingError: type 'dict' is not supported` | JSONB patched to `Text()` | Use `JsonAsText` TypeDecorator instead |
 
-### Issue: bcrypt ValueError (password > 72 bytes)
-**Cause**: Incompatibility between passlib 1.7.4 and bcrypt 5.0.0
-**Solution**: Pin `bcrypt==4.0.1` in requirements.txt
+## Face Geometry Details
 
-### Issue: Tables not visible across connections
-**Cause**: SQLite in-memory DB isolation
-**Solution**: Use shared cache + StaticPool (see test_integration_auth.py)
-
-## Database Models
-
-### Key Models
-1. **User** (`app/models/users.py`)
-   - Stores user credentials and face embeddings (512D vector)
-   - Fields: id, full_name, email, hashed_password, face_embedding, age, gender
-
-2. **Emotion** (`app/models/emotions.py`)
-   - Emotion detection records linked to users
-   - Stores emotion probabilities and timestamps
-
-3. **FaceSessionEmbedding** (`app/models/face_session.py`)
-   - Stores multiple face embeddings per user for PCA analysis
-   - Links to User model via user_id
-
-### Database Migrations
-```bash
-# Create new migration
-docker exec emotrack_backend alembic revision --autogenerate -m "description"
-
-# Run migrations
-docker exec emotrack_backend alembic upgrade head
-```
-
-## ML Models & Inference
-
-### Models Located: `backend/ml_weights/`
-1. **detection.onnx** - Face detection (YuNet or similar)
-2. **recognition.onnx** - ArcFace face embeddings (512D)
-3. **liveness.onnx** - Anti-spoofing / liveness detection
-4. **emotion.onnx** - 7 emotion classification
-
-### Inference Engine
-File: `app/services/inference_engine.py`
-- Singleton pattern (`inference_engine` instance)
-- Loads all models on startup via lifespan
-- Provides `detect()`, `recognize()`, `check_liveness()`, `detect_emotion()`
-
-### Face Geometry Analysis
 File: `app/services/face_geometry.py`
-- Estimates head pose (yaw, pitch, roll) from 5-point landmarks
-- Calculates EAR (Eye Aspect Ratio) for blink detection
-- Calculates MAR (Mouth Aspect Ratio) for mouth opening
-- Uses **direct Euler angle extraction** from rotation matrix (NOT decompose
-HomographyMat - that was buggy!)
 
-## API Endpoints
+- **EAR** (Eye Aspect Ratio): blink threshold `0.22`, drowsiness threshold `0.18`
+- **MAR** (Mouth Aspect Ratio): yawn/talking detection
+- **Head pose**: SolvePnP → direct Euler angle extraction from rotation matrix (NOT `decomposeHomographyMat` — that had bugs)
+- **SCRFD 5-point landmarks**: index 0=left eye, 1=right eye, 2=nose, 3=mouth-left, 4=mouth-right
 
-### Authentication
-- `POST /api/v1/auth/register` - User registration
-- `POST /api/v1/auth/login` - JWT token login
+## Critical Version Pins
 
-### Users
-- `GET /api/v1/users/me` - Get current user (protected)
-
-### Emotions
-- `POST /api/v1/emotions/` - Record emotion detection
-- `GET /api/v1/emotions/user/{user_id}` - Get user's emotion history
-
-### Analytics
-- `GET /api/v1/analytics/*` - PCA and similarity analytics
-
-### WebSocket
-- `WS /ws/stream` - Real-time face tracking stream
-  - Requires JWT token via query param: `?token=<access_token>`
-  - Returns JSON with bounding boxes, liveness, emotions, similarity
-
-## Recent Work Done
-
-### Feb 27, 2026 - Integration Auth Tests Fixed
-- Fixed "no such table: users" error in integration tests
-- Root cause: SQLite in-memory database connection isolation
-- Solution: Switched to `sqlite:///:memory:?cache=shared` with StaticPool
-- Overrode app lifespan to prevent PostgreSQL connection in tests
-- Pinned bcrypt==4.0.1 for passlib compatibility
-- **Result**: All 13 integration auth tests now pass ✅
-
-### Prior Work (by owner)
-- Unit tests for face_geometry (estimate_head_pose, EAR, MAR)
-- Found 5 real bugs through unit testing
-- Replaced decompose
-HomographyMat with direct Euler angle extraction
-- Added PCA analytics to SCD (Stored Consolidated Data)
-- Refactored stream.py for PCA-EAR handling
-- Set up conftest.py with fixtures for embeddings, landmarks, images
-
-## Development Workflow
-
-### Making Changes
-1. Read existing code before modifying
-2. Understand the current architecture
-3. Make minimal, focused changes
-4. Write/update tests if needed
-5. Run tests to verify: `docker exec emotrack_backend pytest`
-6. Ask user before committing if uncertain
-
-### Debugging
-1. Check container logs: `docker logs emotrack_backend`
-2. Exec into container: `docker exec -it emotrack_backend bash`
-3. Use pytest with `-v -s` for detailed output
-4. Add strategic print statements (remove after debugging)
-5. Check database state: `docker exec emotrack_backend psql -U beauAdmin -d emotrack`
-
-### Git Workflow
-User has uncommitted changes:
-- Modified: `backend/requirements.txt`
-- Untracked: `backend/tests/test_integration_auth.py`
-
-**Before committing, ask the user if they want to:**
-- Review changes first
-- Add/modify commit message
-- Stage specific files
-
-## Dependencies & Versions
-
-### Critical Version Pins
 ```
-Python: 3.12
-FastAPI: 0.110.0
-SQLAlchemy: 2.0.35
-pgvector: 0.3.6
-bcrypt: 4.0.1  # For passlib 1.7.4 compatibility
-passlib[bcrypt]: 1.7.4
-pytest: 7.4.3
-onnxruntime: 1.20.0
-numpy: 1.26.4
-opencv-python-headless: 4.10.0.84
+bcrypt==4.0.1         # passlib 1.7.4 compatibility
+passlib[bcrypt]==1.7.4
+numpy==1.26.4
+onnxruntime==1.20.0
+sqlalchemy==2.0.35
+pgvector==0.3.6
+fastapi==0.110.0
 ```
-
-See `backend/requirements.txt` for full list.
-
-## Contact & Collaboration
-
-- **Owner**: beaunix
-- **Project Started**: Before Claude's involvement (2026)
-- **Claude's Role**: Testing, debugging, code review, improvements
-
-### When to Ask the User
-- Before modifying production code (app/)
-- Before committing changes
-- When uncertain about requirements
-- When finding bugs in production code
-- Before adding new dependencies
-- Before making architectural changes
 
 ## Resources
 
-- **Test Fix Notes**: `privates/test_int_auth_fix.txt`
-- **Container Name**: `emotrack_backend`
-- **Database Container**: `db` (PostgreSQL)
-- **Database URL**: `postgresql://beauAdmin:***@db:5432/emotrack`
-
----
-
-**Remember**: This project was built with care by its owner. Claude's job is to assist, not to rebuild or over-engineer. Keep changes minimal, focused, and respectful of the existing architecture.
+- Detailed test fix notes: `privates/test_int_auth_fix.txt`
+- Working test examples: `backend/tests/test_integration_auth.py`, `backend/tests/test_integration_emotions.py`
+- Canonical fixtures: `backend/tests/conftest.py`
+- Container names: `emotrack_backend` (API), `emotrack_db` (PostgreSQL), `emotrack_frontend` (React)

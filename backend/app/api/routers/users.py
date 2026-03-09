@@ -100,7 +100,7 @@ def update_face_embedding(
     return current_user
 
 
-@router.delete("/me/face_embedding", status_code=status.HTTP_200_OK, response_model=UserResponse)
+@router.delete("/me/face_embedding", status_code=status.HTTP_200_OK)
 def delete_face_embedding(
     
     current_user: User = Depends(get_current_active_user),
