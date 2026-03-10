@@ -257,4 +257,13 @@ logs/*.log
 #NnOT LOGS ON MY TRACKING HISTORY 
 logs/
 
+#Ingore Critical Sensible deployment files.
 
+#backend/docker-entrypoint.sh
+#backend/Dockerfile.prod
+#backend/task-definition.json
+
+.env
+*.csv
+~/.aws/credentials
+backend/ml_weights/

@@ -1,0 +1,74 @@
+{
+  "family": "emotitron-backend-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::401257550058:role/emotitron-task-execution-role",
+  "taskRoleArn": "arn:aws:iam::401257550058:role/emotitron-task-execution-role",
+  "containerDefinitions": [
+    {
+      "name": "emotitron-backend",
+      "image": "401257550058.dkr.ecr.us-east-1.amazonaws.com/emotitron-backend:latest",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "ENVIRONMENT",
+          "value": "production"
+        },
+        {
+          "name": "MODELS_PATH",
+          "value": "./ml_weights"
+        },
+        {
+          "name": "ACCESS_TOKEN_EXPIRE_MINUTES",
+          "value": "30"
+        },
+        {
+          "name": "DB_PORT",
+          "value": "5432"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:ssm:us-east-1:401257550058:parameter/emotitron/DATABASE_URL"
+        },
+        {
+          "name": "SECRET_KEY",
+          "valueFrom": "arn:aws:ssm:us-east-1:401257550058:parameter/emotitron/SECRET_KEY"
+        },
+        {
+          "name": "POSTGRES_PASSWORD",
+          "valueFrom": "arn:aws:ssm:us-east-1:401257550058:parameter/emotitron/DB_PASSWORD"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/emotitron-backend",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs",
+          "awslogs-create-group": "true"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:8000/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 10,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
