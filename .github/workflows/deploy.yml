@@ -38,6 +38,7 @@ jobs:
 
     env:
       DATABASE_URL:              postgresql://test_user:test_password@localhost:5432/test_emotitron
+      DATABASE_URL_OVERRIDE:     postgresql://test_user:test_password@localhost:5432/test_emotitron    
       SECRET_KEY:                ci-test-secret-key-not-for-production-use-only
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
       MODELS_PATH:               ./ml_weights
