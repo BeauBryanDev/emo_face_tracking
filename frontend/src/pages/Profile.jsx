@@ -26,6 +26,7 @@ const SectionCard = ({ children, accent = false, danger = false }) => (
     boxShadow: accent ? '0 0 20px rgba(170,0,255,0.1)' : 'none',
     padding: '1.5rem',
     position: 'relative',
+    borderRadius: '10px',
   }}>
     <div style={{
       position: 'absolute', top: 0, left: 0, width: 12, height: 12,

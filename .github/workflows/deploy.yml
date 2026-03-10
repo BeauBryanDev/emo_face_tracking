@@ -105,6 +105,14 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+
+      - name: Download ONNX models from S3
+        run: |
+          aws s3 cp s3://emotitron-frontend-beauland/ml_weights/ backend/ml_weights/ \
+            --recursive \
+            --region us-east-1
+
+            
       - name: Build, tag, and push image to ECR
         id: build-image
         env:
@@ -213,7 +221,13 @@ jobs:
           aws s3 cp dist/index.html s3://${{ secrets.S3_BUCKET }}/index.html \
             --cache-control "no-cache, no-store, must-revalidate"
 
+      # - name: Invalidate CloudFront cache
+      #   run: |
+      #     aws cloudfront create-invalidation \
+      #       --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
+      #       --paths "/*"
       - name: Invalidate CloudFront cache
+        if: ${{ secrets.CLOUDFRONT_DIST_ID != 'placeholder' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DIST_ID }} \
