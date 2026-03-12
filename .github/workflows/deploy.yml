@@ -1,10 +1,11 @@
 name: EmotiTron CI/CD
 
 on:
-  push:
-    branches: [master]
-  pull_request:
-    branches: [master]
+  workflow_dispatch:	
+  #push:
+    #branches: [master]
+  #pull_request:
+    #branches: [master]
 
 env:
   AWS_REGION:       us-east-1

@@ -514,4 +514,96 @@ aws ec2 describe-security-groups \
 
 ```
 
+##  check status of ECS Services tasks
+
+```bash
+
+aws ecs describe-services \
+    --cluster cluster-v2 \
+    --services backend-service \
+    --query 'services[0].{Status:status,Running:runningCount,Pending:pendingCount,Desired:desiredCount}' \
+    --region us-east-1
+```
+
+## Check Logs if Fails 
+
+```bash
+
+aws logs get-log-events \
+    --log-group-name /ecs/servies-backend \
+    --log-stream-name "$(aws logs describe-log-streams \
+        --log-group-name /ecs/backend-service  \
+        --order-by LastEventTime \
+        --descending \
+        --query 'logStreams[0].logStreamName' \
+        --output text \
+        --region us-east-1)" \
+    --query 'events[-30:].message' \
+    --output text \
+    --region us-east-1
+
+```
+##  Add inbound Rule to Security Group 
+
+```bash 
+aws ec2 authorize-security-group-ingress \ 
+    --group-id sg-security.group \
+    --protocol tcp \
+    --port 8000 \
+    --cidr 0.0.0.0/0 \
+    --region us-east-1
+
+```
+
+##  Set S3 bucket for static Oputput 
+
+```bash
+
+aws s3 website s3://emotitron-frontend-beauland \
+    --index-document index.html \
+    --error-document index.html
+
+```
+
+## Create ClaudFront Dist
+
+```bash
+
+aws cloudfront create-distribution \
+    --distribution-config '{
+        "CallerReference": "emotitron-frontend-2026",
+        "Origins": {
+            "Quantity": 1,
+            "Items": [{
+                "Id": "emotitron-s3-origin",
+                "DomainName": "emotitron-frontend-beauland.s3.us-east-1.amazonaws.com",
+                "S3OriginConfig": {"OriginAccessIdentity": ""}
+            }]
+        },
+        "DefaultCacheBehavior": {
+            "TargetOriginId": "emotitron-s3-origin",
+            "ViewerProtocolPolicy": "redirect-to-https",
+            "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6",
+            "AllowedMethods": {
+                "Quantity": 2,
+                "Items": ["GET", "HEAD"]
+            }
+        },
+        "CustomErrorResponses": {
+            "Quantity": 1,
+            "Items": [{
+                "ErrorCode": 404,
+                "ResponsePagePath": "/index.html",
+                "ResponseCode": "200",
+                "ErrorCachingMinTTL": 0
+            }]
+        },
+        "DefaultRootObject": "index.html",
+        "Enabled": true,
+        "Comment": "EmotiTron Frontend"
+    }' \
+    --region us-east-1 \
+    --query 'Distribution.{Id:Id,Domain:DomainName,Status:Status}'
+
+```
 

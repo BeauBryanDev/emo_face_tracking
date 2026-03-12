@@ -17,13 +17,13 @@ def compute_entropy(probabilities: list[float]) -> float:
 
 def calculate_russell_coordinates(probabilities):
     """
-    Convierte vector de probabilidades (8 emociones) a coordenadas Russell (X, Y).
-    Orden esperado: [Happiness, Surprise, Contempt, Neutral, Disgust, Fear, Anger, Sadness]
+    Converts probability vector (8 emotions) to Russell coordinates (X, Y).
+    Expected order: [Happiness, Surprise, Contempt, Neutral, Disgust, Fear, Anger, Sadness]
     """
-    # 1. Definimos los pesos de Valencia (X) y Arousal (Y) para cada emoción
-    # Estos valores están normalizados entre -1 y 1
+    # 1. Define Valence (X) and Arousal (Y) weights for each emotion
+    # These values are normalized between -1 and 1
     weights = {
-        # Emoción: (Valencia, Arousal)
+        # Emotion: (Valence, Arousal)
         "Happiness": (0.8,  0.6),
         "Surprise":  (0.3,  0.8),
         "Contempt":  (-0.5, 0.2),
@@ -34,12 +34,12 @@ def calculate_russell_coordinates(probabilities):
         "Sadness":   (-0.8, -0.6)
     }
     
-    # Convertimos los pesos a matrices de numpy para cálculo rápido
+    # Convert weights to numpy arrays for fast calculation
     valencia_weights = np.array([v[0] for v in weights.values()])
     arousal_weights = np.array([v[1] for v in weights.values()])
     
-    # 2. Cálculo del promedio ponderado (Dot Product)
-    # Esto evita saltos bruscos y suaviza la serie de tiempo
+    # 2. Weighted average calculation (Dot Product)
+    # This prevents sudden jumps and smooths the time series
     x_coord = np.dot(probabilities, valencia_weights)
     y_coord = np.dot(probabilities, arousal_weights)
     
